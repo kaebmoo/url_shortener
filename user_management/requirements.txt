@@ -1,0 +1,13 @@
+flask==2.3.3
+Flask-Migrate==2.7.0
+redis
+rq
+Flask-Assets
+Flask-Compress
+Flask-Login
+Flask-Mail
+Flask-WTF
+raygun4py
+WTForms-SQLAlchemy
+email-validator
+redis-py-cluster

@@ -1,0 +1,4 @@
+redis-server
+rq worker --with-scheduler
+web: gunicorn manage:app
+worker: python -u manage.py run_worker
