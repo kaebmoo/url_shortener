@@ -10,10 +10,10 @@ else:
     import urlparse
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
-if os.path.exists('config.env'):
+config_file = os.path.join(basedir, 'config.env')
+if os.path.exists(config_file):
     print('Importing environment from .env file')
-    for line in open('config.env'):
+    for line in open(config_file):
         var = line.strip().split('=')
         if len(var) == 2:
             os.environ[var[0]] = var[1].replace("\"", "")
