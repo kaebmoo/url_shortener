@@ -14,6 +14,7 @@ from flask_login import (
 )
 
 from rq import Queue
+# from flask_rq import get_queue <-- deprecated
 
 from app import db
 from app.account.forms import (
@@ -33,6 +34,8 @@ from redis import Redis
 redis_connection = Redis(host='localhost', port=6379, db=0)
 # Create a queue using the Redis connection
 queue = Queue(connection=redis_connection)
+
+# get_queue() is deprecated use queue instead.
 
 # Configure the connection to the queue (e.g., Redis)
 ## queue = Queue(connection='redis://localhost:6379')  # Replace with your actual connection details
