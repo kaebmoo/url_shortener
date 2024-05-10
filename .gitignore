@@ -1,0 +1,8 @@
+.DS_Store
+/user_management/__pycache__
+*.pyc
+/user_management/venv
+/user_management/app/static/webassets-external
+*.sqlite
+user_management/data-dev.sqlite
+config.env
