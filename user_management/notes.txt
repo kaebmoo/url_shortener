@@ -1,3 +1,4 @@
+source venv/bin/activate
 redis-server
 rq worker --with-scheduler
 

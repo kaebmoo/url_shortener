@@ -5,6 +5,7 @@ from flask import (
     render_template,
     request,
     url_for,
+    session,
 )
 from flask_login import (
     current_user,
@@ -22,12 +23,17 @@ from app.account.forms import (
     ChangePasswordForm,
     CreatePasswordForm,
     LoginForm,
+    RegistrationFormSelect,
     RegistrationForm,
+    PhoneNumberForm,
     RequestResetPasswordForm,
     ResetPasswordForm,
+    OTPForm,
 )
 from app.email import send_email
 from app.models import User
+from app.utils import send_otp, generate_otp
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from redis import Redis
 # Create a Redis connection (adjust the parameters accordingly)
@@ -48,7 +54,12 @@ def login():
     """Log in an existing user."""
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
+        login_method = request.form.get('login_method')
+        if login_method == 'email':
+            user = User.query.filter_by(email=form.email.data).first()
+        else:
+            user = User.query.filter_by(phone_number=form.phone_number.data).first()
+
         if user is not None and user.password_hash is not None and \
                 user.verify_password(form.password.data):
             login_user(user, form.remember_me.data)
@@ -58,15 +69,26 @@ def login():
             flash('Invalid email or password.', 'error')
     return render_template('account/login.html', form=form)
 
-
 @account.route('/register', methods=['GET', 'POST'])
 def register():
+    form = RegistrationFormSelect()
+    if form.validate_on_submit():
+        registration_type = form.registration_type.data
+        if registration_type == 'email':
+            return redirect(url_for('account.register_email'))
+        else:
+            return redirect(url_for('account.register_phone'))
+    return render_template('account/register_select.html', form=form)
+
+@account.route('/register_email', methods=['GET', 'POST'])
+def register_email():
     """Register a new user, and send them a confirmation email."""
     form = RegistrationForm()
     if form.validate_on_submit():
         user = User(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
+            phone_number = '',
             email=form.email.data,
             password=form.password.data)
         db.session.add(user)
@@ -85,6 +107,22 @@ def register():
               'warning')
         return redirect(url_for('main.index'))
     return render_template('account/register.html', form=form)
+
+@account.route('/register_phone', methods=['GET', 'POST'])
+def register_phone():
+    form = PhoneNumberForm()
+    if form.validate_on_submit():
+        otp = generate_otp()
+        queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
+        # send_otp(phone_number, otp)
+        
+        session['otp'] = otp
+        session['phone_number'] = form.phone_number.data
+        session['password'] = generate_password_hash(form.password.data)  # You should hash the password
+        
+        return redirect(url_for('account.verify_otp'))
+    return render_template('account/register_phone.html', form=form)
+
 
 
 @account.route('/logout')
@@ -236,6 +274,29 @@ def confirm(token):
     else:
         flash('The confirmation link is invalid or has expired.', 'error')
     return redirect(url_for('main.index'))
+
+@account.route('/verify_otp', methods=['GET', 'POST'])
+def verify_otp():
+    form = OTPForm()
+    if form.validate_on_submit():
+        entered_otp = form.otp.data
+        if entered_otp == str(session.get('otp')):
+            phone_number = session.get('phone_number')
+            password = session.get('password')
+            
+            user = User(
+                first_name='',
+                last_name='',
+                email='dummy@ntplc.co.th',
+                phone_number=phone_number, password=password, confirmed=True)  # You should hash the password
+            db.session.add(user)
+            db.session.commit()
+            login_user(user)
+            flash('Phone number verified and registered successfully!', 'success')
+            return redirect(url_for('main.index'))  # Adjust to your dashboard route
+        else:
+            flash('Invalid OTP.', 'error')
+    return render_template('account/verify_otp.html', form=form)
 
 
 @account.route(

@@ -2,6 +2,7 @@ from flask import url_for
 from flask_wtf import FlaskForm
 from wtforms import ValidationError
 from wtforms.fields import (
+    RadioField,
     BooleanField,
     PasswordField,
     StringField,
@@ -9,20 +10,63 @@ from wtforms.fields import (
 )
 # from wtforms.fields.html5 import EmailField
 from wtforms.fields import DateField, EmailField, TelField
-from wtforms.validators import Email, EqualTo, InputRequired, Length
+from wtforms.validators import Email, EqualTo, InputRequired, Length, Optional
+from wtforms import ValidationError
 
 from app.models import User
 
+'''
+def email_or_phone_required(form, field):
+    if not form.email.data and not form.phone_number.data:
+        raise ValidationError('Either email or phone number is required.')
+'''
 
 class LoginForm(FlaskForm):
+    login_method = RadioField('Login with:', choices=[('email', 'Email'), ('phone', 'Phone Number')], default='email')
     email = EmailField(
-        'Email', validators=[InputRequired(),
+        'Email', validators=[Optional(),
                              Length(1, 64),
                              Email()])
+    phone_number = StringField('Phone Number', validators=[Optional(), Length(min=10, max=15)])
     password = PasswordField('Password', validators=[InputRequired()])
     remember_me = BooleanField('Keep me logged in')
     submit = SubmitField('Log in')
+    def validate(self, extra_validators=None):
+        rv = FlaskForm.validate(self, extra_validators)
+        if not rv:
+            return False
+        if not self.email.data and not self.phone_number.data:
+            self.email.errors.append('Either email or phone number is required.')
+            self.phone_number.errors.append('Either email or phone number is required.')
+            return False
+        return True
 
+class RegistrationFormSelect(FlaskForm):
+    registration_type = RadioField('Register with:', 
+                                   choices=[('email', 'Email'), ('phone', 'Phone Number')], 
+                                   default='email',  # กำหนดค่าเริ่มต้น
+                                   validators=[InputRequired()])
+    submit = SubmitField('Continue')
+
+class PhoneNumberForm(FlaskForm):
+    phone_number = StringField('Phone Number', validators=[InputRequired(), Length(min=10, max=15)])
+    password = PasswordField(
+        'Password',
+        validators=[
+            InputRequired(),
+            EqualTo('password2', 'Passwords must match')
+        ])
+    password2 = PasswordField('Confirm password', validators=[InputRequired()])
+    submit = SubmitField('Send OTP')
+    def validate_phone_number(self, field):
+        if User.query.filter_by(phone_number=field.data).first():
+            raise ValidationError('Phone number already registered. (Did you mean to '
+                                  '<a href="{}">log in</a> instead?)'.format(
+                                    url_for('account.login')))
+
+class OTPForm(FlaskForm):
+    otp = StringField('OTP', validators=[InputRequired(), Length(min=4, max=4)])
+    submit = SubmitField('Verify OTP')
 
 class RegistrationForm(FlaskForm):
     first_name = StringField(
@@ -35,7 +79,7 @@ class RegistrationForm(FlaskForm):
         'Email', validators=[InputRequired(),
                              Length(1, 64),
                              Email()])
-    telephone = TelField('Phone', validators=[InputRequired(), Length(10, 15)])
+    # phone_number = TelField('Phone')
     password = PasswordField(
         'Password',
         validators=[

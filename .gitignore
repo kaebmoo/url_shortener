@@ -6,3 +6,4 @@
 *.sqlite
 user_management/data-dev.sqlite
 config.env
+user_management/app/static/.webassets-cache
