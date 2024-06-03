@@ -34,6 +34,7 @@ from app.email import send_email
 from app.models import User
 from app.utils import send_otp, generate_otp
 from werkzeug.security import check_password_hash, generate_password_hash
+import uuid
 
 from redis import Redis
 # Create a Redis connection (adjust the parameters accordingly)
@@ -113,12 +114,12 @@ def register_phone():
     form = PhoneNumberForm()
     if form.validate_on_submit():
         otp = generate_otp()
-        queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
+        ### queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
         # send_otp(phone_number, otp)
         
         session['otp'] = otp
         session['phone_number'] = form.phone_number.data
-        session['password'] = generate_password_hash(form.password.data)  # You should hash the password
+        session['password'] = form.password.data  # You should hash the password
         
         return redirect(url_for('account.verify_otp'))
     return render_template('account/register_phone.html', form=form)
@@ -287,8 +288,10 @@ def verify_otp():
             user = User(
                 first_name='',
                 last_name='',
-                email='dummy@ntplc.co.th',
-                phone_number=phone_number, password=password, confirmed=True)  # You should hash the password
+                email=uuid.uuid4().hex,
+                phone_number=phone_number, 
+                password=password, 
+                confirmed=True)  # You should hash the password
             db.session.add(user)
             db.session.commit()
             login_user(user)
