@@ -32,7 +32,8 @@ from app.account.forms import (
 )
 from app.email import send_email
 from app.models import User
-from app.utils import send_otp, generate_otp
+from app.utils import generate_otp
+from app.sms import send_otp
 from werkzeug.security import check_password_hash, generate_password_hash
 import uuid
 
@@ -114,7 +115,7 @@ def register_phone():
     form = PhoneNumberForm()
     if form.validate_on_submit():
         otp = generate_otp()
-        ### queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
+        queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
         # send_otp(phone_number, otp)
         
         session['otp'] = otp

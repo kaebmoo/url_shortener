@@ -3,7 +3,7 @@ from wtforms.fields import Field
 from wtforms.widgets import HiddenInput
 import sys
 import random
-from twilio.rest import Client
+
 
 # from wtforms.compat import text_type
 if sys.version_info[0] >= 3:
@@ -53,14 +53,3 @@ class CustomSelectField(Field):
 def generate_otp():
     return random.randint(1000, 9999)
 
-def send_otp(phone_number, otp):
-    account_sid = 'your_twilio_account_sid'
-    auth_token = 'your_twilio_auth_token'
-    client = Client(account_sid, auth_token)
-
-    message = client.messages.create(
-        body=f'Your OTP code is {otp}',
-        from_='your_twilio_phone_number',
-        to=phone_number
-    )
-    return message.sid
