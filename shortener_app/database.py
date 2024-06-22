@@ -13,3 +13,7 @@ SessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine
 )
 Base = declarative_base()
+
+# ฟังก์ชันสร้างตาราง
+def init_db():
+    Base.metadata.create_all(bind=engine)
