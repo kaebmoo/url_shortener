@@ -52,6 +52,9 @@ class Config:
     # MAIL_USERNAME can't use 
     # use EMAIL_SENDER for sendgrid. Verify ownership of a single email address to use as a sender.
 
+    # INFOBIP
+    INFOBIP = os.environ.get('INFOBIP') 
+
     REDIS_URL = os.getenv('REDISTOGO_URL', 'http://localhost:6379')
 
     RAYGUN_APIKEY = os.environ.get('RAYGUN_APIKEY')

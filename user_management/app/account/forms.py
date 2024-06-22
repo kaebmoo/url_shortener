@@ -12,6 +12,8 @@ from wtforms.fields import (
 from wtforms.fields import DateField, EmailField, TelField
 from wtforms.validators import Email, EqualTo, InputRequired, Length, Optional
 from wtforms import ValidationError
+import phonenumbers
+from phonenumbers import NumberParseException, PhoneNumberFormat
 
 from app.models import User
 
@@ -20,6 +22,20 @@ def email_or_phone_required(form, field):
     if not form.email.data and not form.phone_number.data:
         raise ValidationError('Either email or phone number is required.')
 '''
+def validate_and_format_phone_number(form, field):
+    try:
+        # Parse the phone number with TH (Thailand) as the default region
+        parsed_number = phonenumbers.parse(field.data, "TH")
+        
+        # Validate the parsed number
+        if phonenumbers.is_valid_number(parsed_number):
+            # Format the number in E164 format (e.g., +66813520625)
+            formatted_number = phonenumbers.format_number(parsed_number, PhoneNumberFormat.E164)
+            field.data = formatted_number.replace('+', '')  # Update field data with the formatted number without '+'
+        else:
+            raise ValidationError('Invalid phone number.')
+    except NumberParseException:
+        raise ValidationError('Invalid phone number format.')
 
 class LoginForm(FlaskForm):
     login_method = RadioField('Login with:', choices=[('email', 'Email'), ('phone', 'Phone Number')], default='email')
@@ -27,7 +43,7 @@ class LoginForm(FlaskForm):
         'Email', validators=[Optional(),
                              Length(1, 64),
                              Email()])
-    phone_number = StringField('Phone Number', validators=[Optional(), Length(min=10, max=15)])
+    phone_number = StringField('Phone Number', validators=[Optional(), Length(min=10, max=15), validate_and_format_phone_number])
     password = PasswordField('Password', validators=[InputRequired()])
     remember_me = BooleanField('Keep me logged in')
     submit = SubmitField('Log in')
@@ -49,7 +65,13 @@ class RegistrationFormSelect(FlaskForm):
     submit = SubmitField('Continue')
 
 class PhoneNumberForm(FlaskForm):
-    phone_number = StringField('Phone Number', validators=[InputRequired(), Length(min=10, max=15)])
+    first_name = StringField(
+        'First name', validators=[InputRequired(),
+                                  Length(1, 64)])
+    last_name = StringField(
+        'Last name', validators=[InputRequired(),
+                                 Length(1, 64)])
+    phone_number = StringField('Phone Number', validators=[InputRequired(), Length(min=10, max=15), validate_and_format_phone_number])
     password = PasswordField(
         'Password',
         validators=[

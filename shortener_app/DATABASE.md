@@ -1,0 +1,12 @@
+```
+CREATE TABLE urls (
+    id INTEGER PRIMARY KEY,
+    key VARCHAR(255) UNIQUE,
+    secret_key VARCHAR(255) UNIQUE,
+    target_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    clicks INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```

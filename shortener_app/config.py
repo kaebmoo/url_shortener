@@ -2,13 +2,19 @@
 
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+import os
+
+# โหลดค่าจาก .env
+load_dotenv()
 
 
 class Settings(BaseSettings):
 
     env_name: str = "Local"
-    base_url: str = "http://localhost:8000"
-    db_url: str = "sqlite:///./shortener.db"
+    base_url: str = os.getenv('BASE_URL', 'http://localhost:8000')
+    db_url: str = os.getenv('DB_URL', 'sqlite:///./shortener.db')
+    secret_key: str = os.getenv('SECRET_KEY', 'default_secret_key')  # เพิ่ม SECRET_KEY
     model_config = SettingsConfigDict(env_file=".env")
 
 

@@ -68,7 +68,7 @@ def login():
             flash('You are now logged in. Welcome back!', 'success')
             return redirect(request.args.get('next') or url_for('main.index'))
         else:
-            flash('Invalid email or password.', 'error')
+            flash('Invalid email, phone or password.', 'error')
     return render_template('account/login.html', form=form)
 
 @account.route('/register', methods=['GET', 'POST'])
@@ -119,6 +119,8 @@ def register_phone():
         # send_otp(phone_number, otp)
         
         session['otp'] = otp
+        session['first_name'] = form.first_name.data
+        session['last_name'] = form.last_name.data
         session['phone_number'] = form.phone_number.data
         session['password'] = form.password.data  # You should hash the password
         
@@ -283,13 +285,15 @@ def verify_otp():
     if form.validate_on_submit():
         entered_otp = form.otp.data
         if entered_otp == str(session.get('otp')):
+            first_name = session.get('first_name')
+            last_name = session.get('last_name')
             phone_number = session.get('phone_number')
             password = session.get('password')
             
             user = User(
-                first_name='',
-                last_name='',
-                email=uuid.uuid4().hex,
+                first_name=first_name,
+                last_name=last_name,
+                email=uuid.uuid4().hex, # Assuming email is not used for phone registration
                 phone_number=phone_number, 
                 password=password, 
                 confirmed=True)  # You should hash the password
