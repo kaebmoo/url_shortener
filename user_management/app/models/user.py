@@ -11,6 +11,7 @@ from .. import db, login_manager
 class Permission:
     GENERAL = 0x01
     ADMINISTER = 0xff
+    VIP = 0x02
 
 
 class Role(db.Model):
@@ -56,6 +57,9 @@ class User(UserMixin, db.Model):
     phone_number = db.Column(db.String(15), unique=True, index=True, nullable=True)
     password_hash = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+    uid = db.Column(db.String(64), unique=True, index=True)
+    # created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
+    # updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)

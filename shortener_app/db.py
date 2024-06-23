@@ -1,4 +1,5 @@
 # https://timberry.dev/posts/fastapi-with-apikeys/
+# เพื่อการทดสอบ
 '''
 This file is basically a placeholder for whatever backend database integration you want to use. 
 Right now, it implements the methods we needs, and contains a hard-coded set of API keys and users.

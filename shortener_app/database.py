@@ -14,6 +14,20 @@ SessionLocal = sessionmaker(
 )
 Base = declarative_base()
 
-# ฟังก์ชันสร้างตาราง
-def init_db():
-    Base.metadata.create_all(bind=engine)
+# Database for API keys (user management or other purposes)
+engine_api = create_engine(
+    get_settings().db_api, connect_args={"check_same_thread": False}
+)
+SessionAPI = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine_api
+)
+BaseAPI = declarative_base()
+
+
+# ฟังก์ชันสร้างตารางสำหรับ URL shortener
+# def init_db():
+#    Base.metadata.create_all(bind=engine)
+
+# ฟังก์ชันสร้างตารางสำหรับ API keys
+# def init_api_db():
+#     BaseAPI.metadata.create_all(bind=engine_api)

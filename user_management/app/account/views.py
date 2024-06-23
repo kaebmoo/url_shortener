@@ -87,11 +87,13 @@ def register_email():
     """Register a new user, and send them a confirmation email."""
     form = RegistrationForm()
     if form.validate_on_submit():
+        uid = uuid.uuid4().hex
         user = User(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             phone_number = '',
             email=form.email.data,
+            uid = uid,
             password=form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -289,11 +291,12 @@ def verify_otp():
             last_name = session.get('last_name')
             phone_number = session.get('phone_number')
             password = session.get('password')
-            
+            uid = uuid.uuid4().hex
             user = User(
                 first_name=first_name,
                 last_name=last_name,
-                email=uuid.uuid4().hex, # Assuming email is not used for phone registration
+                email=uid, # Assuming email is not used for phone registration
+                uid = uid,
                 phone_number=phone_number, 
                 password=password, 
                 confirmed=True)  # You should hash the password
