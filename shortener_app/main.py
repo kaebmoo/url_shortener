@@ -1,5 +1,5 @@
 # shortener_app/main.py
-
+import requests  # Import for checking website existence
 import secrets
 import validators
 from fastapi import Depends, FastAPI, HTTPException, Request, status, Security
@@ -57,16 +57,6 @@ def get_api_db():
 
 api_key_header = APIKeyHeader(name="X-API-KEY")
 
-
-'''# ฟังก์ชันตรวจสอบ API key จากฐานข้อมูล API keys
-async def verify_api_key(
-    api_key: str = Depends(api_key_header),
-    db: Session = Depends(get_api_db)
-):
-    db_api_key = crud.get_api_key(db, api_key)
-    if not db_api_key:
-        raise_api_key(api_key)'''
-
 # Updated API key verification function
 async def verify_api_key(
     request: Request, db: Session = Depends(get_api_db)
@@ -90,24 +80,23 @@ def forward_to_target_url(
         request: Request,
         db: Session = Depends(get_db)
     ):
-
+    
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
+        # Check if target URL exists
+        try:
+            response = requests.head(db_url.target_url, timeout=5)
+            if response.status_code >= 400:  # Check for client or server errors
+                raise_bad_request(message="The target URL '{db_url.target_url}' is not reachable.")
+        except requests.RequestException: # Catch all request exceptions
+            raise_bad_request(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
         crud.update_db_clicks(db=db, db_url=db_url)
         return RedirectResponse(db_url.target_url)
     else:
         raise_not_found(request)
+
     # The := operator is colloquially known as the walrus operator and gives you a new syntax for assigning variables in the middle of expressions.
     # If db_url is a database entry, then you return your RedirectResponse to target_url. Otherwise, you call raise_not_found()
 
-
-'''@app.post("/url", response_model=schemas.URLInfo)
-def create_url(url: schemas.URLBase, db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)):
-    # ตรวจสอบ URL
-    if not validators.url(url.target_url):
-        raise_bad_request(message="Your provided URL is not valid")
-    
-    db_url = crud.create_db_url(db=db, url=url)
-    return get_admin_info(db_url)'''
 
 @app.post("/url", response_model=schemas.URLInfo, tags=["url"]) # , dependencies=[Security(verify_api_key)]
 def create_url(
