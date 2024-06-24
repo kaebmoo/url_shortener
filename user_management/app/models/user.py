@@ -54,12 +54,12 @@ class User(UserMixin, db.Model):
     first_name = db.Column(db.String(64), index=True)
     last_name = db.Column(db.String(64), index=True)
     email = db.Column(db.String(64), unique=True, index=True)
-    phone_number = db.Column(db.String(15), unique=True, index=True, nullable=True)
+    phone_number = db.Column(db.String(15), index=True, nullable=True)
     password_hash = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
     uid = db.Column(db.String(64), unique=True, index=True)
-    # created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
-    # updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
+    created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)

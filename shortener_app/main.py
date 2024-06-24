@@ -36,7 +36,7 @@ def raise_api_key(api_key: str):
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message)
 
 
-app = FastAPI()
+app = FastAPI(root_path="/api/v1")
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 

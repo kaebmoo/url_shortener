@@ -12,3 +12,5 @@ shortener_app/.env
 user_management/dump.rdb
 shortener.db
 /shortener_app/alembic
+/user_management/alembic
+user_management/alembic.ini
