@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 import os
 
 # โหลดค่าจาก .env
-load_dotenv()
-
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), 'config.env'))
 
 class Settings(BaseSettings):
 
@@ -17,6 +16,8 @@ class Settings(BaseSettings):
     secret_key: str = os.getenv('SECRET_KEY', 'default_secret_key')  # เพิ่ม SECRET_KEY
     db_api: str = os.getenv('DB_API', 'sqlite:///./user_management/data-dev.sqlite')
     model_config = SettingsConfigDict(env_file=".env")
+    host: str = os.getenv('HOST', '127.0.0.1')
+    port: int = os.getenv('PORT', 8000)
 
 
 @lru_cache
@@ -24,6 +25,7 @@ def get_settings() -> Settings:
 
     settings = Settings()
     print(f"Loading settings for: {settings.env_name}")
+    print(f"Base URL: {settings.base_url}")
 
     return settings
 

@@ -66,6 +66,8 @@ def login():
                 user.verify_password(form.password.data):
             login_user(user, form.remember_me.data)
             flash('You are now logged in. Welcome back!', 'success')
+            # เก็บค่า uid, email, phone, หรืออื่น อื่น ใน session
+            session['uid'] = user.uid
             return redirect(request.args.get('next') or url_for('main.index'))
         else:
             flash('Invalid email, phone or password.', 'error')

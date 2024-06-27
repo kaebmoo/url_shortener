@@ -1,0 +1,48 @@
+{% extends 'layouts/base.html' %}
+{% import 'macros/form_macros.html' as f %}
+
+{% block content %}
+    <div class="ui grid container">
+        <div class="eight wide computer sixteen wide mobile centered column">
+            <h2 class="ui dividing header">Shorten URL</h2>
+            {% set flashes = {
+                'error':   get_flashed_messages(category_filter=['form-error']),
+                'warning': get_flashed_messages(category_filter=['form-check-email']),
+                'info':    get_flashed_messages(category_filter=['form-info']),
+                'success': get_flashed_messages(category_filter=['form-success'])
+            } %}
+            {{ f.begin_form(form, flashes) }}
+                {{ f.render_form_field(form.original_url) }}
+                {{ f.form_message(flashes['error'], header='Something went wrong.', class='error') }}
+                {{ f.form_message(flashes['success'], header='Success!', class='success') }}
+                {{ f.render_form_field(form.submit) }}
+            {{ f.end_form(form) }}
+            {% if message %}
+                <div class="ui message">
+                    <p>{{ message }}</p>
+                </div>
+            {% endif %}
+            {% if short_url %}
+                <div class="ui action input" style="width: 100%;">
+                    <input type="text" id="shortUrl" value="{{ short_url }}" readonly style="width: 80%;">
+                    <button class="ui button" onclick="copyToClipboard()">Copy</button>
+                </div>
+                <div class="ui message">
+                    <h3>QR Code</h3>
+                    <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code"/>
+                    <br>
+                    <a href="data:image/png;base64,{{ qr_code_base64 }}" download="qrcode.png">Download QR Code</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+        function copyToClipboard() {
+            var copyText = document.getElementById("shortUrl");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999); // For mobile devices
+            document.execCommand("copy");
+            alert("Copied the URL: " + copyText.value);
+        }
+    </script>
+{% endblock %}

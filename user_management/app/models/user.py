@@ -5,6 +5,7 @@ from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
 from itsdangerous import BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
+
 from .. import db, login_manager
 
 
@@ -203,6 +204,7 @@ class AnonymousUser(AnonymousUserMixin):
 
     def is_admin(self):
         return False
+
 
 
 login_manager.anonymous_user = AnonymousUser

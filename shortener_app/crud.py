@@ -52,5 +52,15 @@ def deactivate_db_url_by_secret_key(db: Session, secret_key: str) -> models.URL:
 def get_api_key(db: Session, api_key: str) -> models.APIKey:
     return db.query(models.APIKey).filter(models.APIKey.uid == api_key).first()
 
-def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> bool:
-    return db.query(models.URL).filter(models.URL.target_url == target_url, models.URL.api_key == api_key, models.URL.is_active).first() is not None
+# def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> bool:
+#     return db.query(models.URL).filter(models.URL.target_url == target_url, models.URL.api_key == api_key, models.URL.is_active).first() is not None
+
+def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> models.URL | None:
+    """Checks if a URL exists for a given target_url and api_key. 
+    Returns the URL object if found, or None if not found."""
+
+    return db.query(models.URL).filter(
+        models.URL.target_url == target_url, 
+        models.URL.api_key == api_key, 
+        models.URL.is_active
+    ).first()  # This will return the URL object itself or None
