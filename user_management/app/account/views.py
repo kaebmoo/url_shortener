@@ -20,6 +20,7 @@ from rq import Queue
 from app import db
 from app.account.forms import (
     ChangeEmailForm,
+    ChangePhoneForm,
     ChangePasswordForm,
     CreatePasswordForm,
     LoginForm,
@@ -36,6 +37,8 @@ from app.utils import generate_otp
 from app.sms import send_otp
 from werkzeug.security import check_password_hash, generate_password_hash
 import uuid
+from email_validator import validate_email, EmailNotValidError
+import phonenumbers
 
 from redis import Redis
 # Create a Redis connection (adjust the parameters accordingly)
@@ -146,7 +149,19 @@ def logout():
 @login_required
 def manage():
     """Display a user's account information."""
-    return render_template('account/manage.html', user=current_user, form=None)
+    try:
+        validate_email(current_user.email)
+        email_or_phone = current_user.email
+        is_email = True
+    except EmailNotValidError:
+        # Handle invalid email
+        # It is the UID in the email, it is the user who registered with the phone number. 
+        # bring phone number information to display instead.
+        phone_number = phonenumbers.parse(current_user.phone_number, "TH")
+        phone_number = phonenumbers.format_number(phone_number, phonenumbers.PhoneNumberFormat.NATIONAL)
+        email_or_phone = phone_number
+        is_email = False
+    return render_template('account/manage.html', user=current_user, email_or_phone=email_or_phone, is_email=is_email, form=None)
 
 
 @account.route('/reset-password', methods=['GET', 'POST'])
@@ -201,6 +216,14 @@ def reset_password(token):
 def change_password():
     """Change an existing user's password."""
     form = ChangePasswordForm()
+    try:
+        validate_email(current_user.email)
+        is_email = True
+    except EmailNotValidError:
+        # Handle invalid email
+        # It is the UID in the email, it is the user who registered with the phone number. 
+        # bring phone number information to display instead.
+        is_email = False
     if form.validate_on_submit():
         if current_user.verify_password(form.old_password.data):
             current_user.password = form.new_password.data
@@ -210,7 +233,7 @@ def change_password():
             return redirect(url_for('main.index'))
         else:
             flash('Original password is invalid.', 'form-error')
-    return render_template('account/manage.html', form=form)
+    return render_template('account/manage.html', form=form, is_email=is_email)
 
 
 @account.route('/manage/change-email', methods=['GET', 'POST'])
@@ -238,8 +261,29 @@ def change_email_request():
             return redirect(url_for('main.index'))
         else:
             flash('Invalid email or password.', 'form-error')
-    return render_template('account/manage.html', form=form)
+    return render_template('account/manage.html', form=form, is_email=True)
 
+@account.route('/manage/change-phone', methods=['GET', 'POST'])
+@login_required
+def change_phone_request():
+    """Respond to existing user's request to change their email."""
+    form = ChangePhoneForm()
+    if form.validate_on_submit():
+        if current_user.verify_password(form.password.data):
+            session['user_id'] = current_user.id
+            new_phone = form.phone_number.data
+            session['phone_number'] = new_phone
+            # send otp to confirm new phone number
+            otp = generate_otp()
+            session['otp'] = otp
+            queue.enqueue(send_otp, phone_number=new_phone, otp=otp)
+            
+            flash('A confirmation otp has been sent to {}.'.format(new_phone),
+                  'warning')
+            return redirect(url_for('account.confirm_otp'))
+        else:
+            flash('Invalid email or password.', 'form-error')
+    return render_template('account/manage.html', form=form, is_email=False)
 
 @account.route('/manage/change-email/<token>', methods=['GET', 'POST'])
 @login_required
@@ -283,6 +327,32 @@ def confirm(token):
         flash('The confirmation link is invalid or has expired.', 'error')
     return redirect(url_for('main.index'))
 
+# for confirm when user change phone number
+@account.route('/confirm_phone', methods=['GET', 'POST'])
+def confirm_otp():
+    form = OTPForm()
+    if form.validate_on_submit():
+        entered_otp = form.otp.data
+        if entered_otp == str(session.get('otp')):
+            user_id = session.get('user_id')
+            phone_number = session.get('phone_number')
+            
+            user = db.session.query(User).filter_by(id=user_id).first()
+            current_user.phone_number = phone_number
+
+            db.session.add(user)
+            db.session.commit()
+            # login_user(user)
+            
+            session.pop('otp', None)
+            session.pop('phone_number', None)
+            flash('Your phone number has been successfully verified and changed.', 'success')
+            return redirect(url_for('account.manage'))  # Adjust to your dashboard route
+        else:
+            flash('Invalid OTP.', 'error')
+    return render_template('account/verify_otp.html', form=form)
+
+# for register user by phone
 @account.route('/verify_otp', methods=['GET', 'POST'])
 def verify_otp():
     form = OTPForm()
@@ -305,6 +375,9 @@ def verify_otp():
             db.session.add(user)
             db.session.commit()
             login_user(user)
+            session.pop('otp', None)
+            session.pop('phone_number', None)
+            session.pop('password', None)
             flash('Phone number verified and registered successfully!', 'success')
             return redirect(url_for('main.index'))  # Adjust to your dashboard route
         else:

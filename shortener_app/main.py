@@ -172,12 +172,14 @@ def create_url(
     existing_url = crud.is_url_existing_for_key(db, url.target_url, api_key)
     if existing_url:
         base_url = get_settings().base_url
+        qr_code_base64 = generate_qr_code(f"{base_url}/{existing_url.key}")
         url_data = {
             "target_url": existing_url.target_url,
             "is_active": existing_url.is_active,
             "clicks": existing_url.clicks,
             "url": f"{base_url}/{existing_url.key}", 
             "admin_url": f"{base_url}/{existing_url.secret_key}",
+            # "qr_code": f"data:image/png;base64,{qr_code_base64}",
             "message": f"A short link for this website already exists."
         }
         return JSONResponse(content=url_data, status_code=200) 

@@ -185,3 +185,14 @@ class ChangeEmailForm(FlaskForm):
     def validate_email(self, field):
         if User.query.filter_by(email=field.data).first():
             raise ValidationError('Email already registered.')
+        
+class ChangePhoneForm(FlaskForm):
+    phone_number = StringField('New phone number', validators=[InputRequired(), 
+                                                           Length(min=10, max=15), 
+                                                           validate_and_format_phone_number])
+    password = PasswordField('Password', validators=[InputRequired()])
+    submit = SubmitField('Update phone number')
+
+    def validate_phone_number(self, field):
+        if User.query.filter_by(phone_number=field.data).first():
+            raise ValidationError('Phone number already registered.')
