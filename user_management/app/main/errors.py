@@ -2,6 +2,9 @@ from flask import render_template
 
 from app.main.views import main
 
+@main.app_errorhandler(400)
+def bad_request(_):
+    return render_template('errors/400.html'), 400
 
 @main.app_errorhandler(403)
 def forbidden(_):
