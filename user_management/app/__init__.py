@@ -81,4 +81,7 @@ def create_app(config):
     from .admin import admin as admin_blueprint
     app.register_blueprint(admin_blueprint, url_prefix='/admin')
 
+    from .url import shorten as shorten_blueprint
+    app.register_blueprint(shorten_blueprint)
+
     return app
