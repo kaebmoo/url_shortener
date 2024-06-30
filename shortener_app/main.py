@@ -47,6 +47,9 @@ def raise_not_found(request):
     message = f"URL '{request.url}' doesn't exist"
     raise HTTPException(status_code=404, detail=message)
 
+def raise_forbidden(message):
+    raise HTTPException(status_code=403, detail=message)
+
 def raise_bad_request(message):
     raise HTTPException(status_code=400, detail=message)
 
@@ -109,7 +112,7 @@ async def verify_api_key(
     api_key = request.headers.get("X-API-KEY")  # Get API key from headers
     if not api_key:
         raise_api_key(api_key) 
-        
+
     db_api_key = crud.get_api_key(db, api_key)
     if not db_api_key:
         raise_api_key(api_key)
@@ -172,6 +175,7 @@ def forward_to_target_url(
 def create_url(
     url: schemas.URLBase,
     db: Session = Depends(get_db),
+    api_db: Session = Depends(get_api_db),
     api_key: str = Depends(verify_api_key)
 ):
     url.target_url = normalize_url(url.target_url, trailing_slash=True)
@@ -179,7 +183,14 @@ def create_url(
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
     
+    # ดึง role_id จาก database
+    role_id = crud.get_role_id(api_db, api_key)
+    
     if url.custom_key:
+        if role_id not in [2, 3]:
+            raise_forbidden(message="You do not have permission to use custom keys")
+            
+        
         if not keygen.is_valid_custom_key(url.custom_key):
             raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
         if len(url.custom_key) > 15:

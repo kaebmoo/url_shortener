@@ -54,6 +54,12 @@ def deactivate_db_url_by_secret_key(db: Session, secret_key: str) -> models.URL:
 def get_api_key(db: Session, api_key: str) -> models.APIKey:
     return db.query(models.APIKey).filter(models.APIKey.uid == api_key).first()
 
+def get_role_id(db: Session, api_key: str) -> int:
+    api_key_data = db.query(models.APIKey).filter(models.APIKey.uid == api_key).first()
+    if api_key_data:
+        return api_key_data.role_id
+    return None
+
 # def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> bool:
 #     return db.query(models.URL).filter(models.URL.target_url == target_url, models.URL.api_key == api_key, models.URL.is_active).first() is not None
 
