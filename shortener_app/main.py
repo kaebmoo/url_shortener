@@ -14,10 +14,11 @@ from qrcodegen import QrCode
 from PIL import Image
 import io
 import base64
+from urllib.parse import urlparse
 
 from .config import get_settings
 from .database import SessionLocal, SessionAPI, engine, engine_api
-from . import crud, models, schemas
+from . import crud, models, schemas, keygen
 
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
@@ -65,14 +66,24 @@ app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 
-def normalize_url(url, add_slash=False):
-    if add_slash:
-        if not url.endswith('/'):
-            url += '/'
-    else:
-        if url.endswith('/'):
-            url = url[:-1]
-    return url
+def normalize_url(url: str, trailing_slash: bool = False) -> str:
+    """Normalizes a URL by optionally adding or removing trailing slashes.
+
+    Args:
+        url: The URL to normalize.
+        trailing_slash: Whether to ensure a trailing slash (True) or remove it (False).
+
+    Returns:
+        The normalized URL.
+    """
+
+    parsed_url = urlparse(url)
+    path = parsed_url.path.rstrip("/")  # Remove all trailing slashes from the path
+    
+    if trailing_slash:
+        path += "/"  # Add a single trailing slash if requested
+
+    return parsed_url._replace(path=path).geturl()
 
 def get_db():
     db = SessionLocal()
@@ -162,13 +173,20 @@ def create_url(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)
 ):
-    url.target_url = normalize_url(url.target_url)
+    url.target_url = normalize_url(url.target_url, trailing_slash=True)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
     
-    # ตรวจสอบว่ามี URL นี้อยู่แล้วหรือไม่สำหรับ API key นี้
-
+    if url.custom_key:
+        if not keygen.is_valid_custom_key(url.custom_key):
+            raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
+        if len(url.custom_key) > 15:
+            raise_bad_request(message="Your provided custom key is too long. It should not exceed 15 characters.")
+        if crud.get_db_url_by_key(db, url.custom_key):
+            raise_already_used(message=f"The custom key '{url.custom_key}' is already in use. Please choose a different key.")
+    
+    # ตรวจสอบว่ามี  URL Target นี้อยู่แล้วหรือไม่สำหรับ API key นี้
     existing_url = crud.is_url_existing_for_key(db, url.target_url, api_key)
     if existing_url:
         base_url = get_settings().base_url

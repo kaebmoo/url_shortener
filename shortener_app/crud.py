@@ -7,7 +7,9 @@ from . import keygen, models, schemas
 def create_db_url(db: Session, url: schemas.URLBase, api_key: str) -> models.URL:
     # key = keygen.create_random_key()
     # secret_key = keygen.create_random_key(length=8)
-    key = keygen.create_unique_random_key(db)
+    
+    # key = keygen.create_unique_random_key(db)
+    key = url.custom_key if url.custom_key else keygen.create_unique_random_key(db)
     secret_key = f"{key}_{keygen.create_random_key(length=8)}"
     
     db_url = models.URL(

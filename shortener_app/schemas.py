@@ -1,9 +1,10 @@
 # shortener_app/schemas.py
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, BaseModel, Field
 
 class URLBase(BaseModel):
     target_url: str
+    custom_key: str = None # Make it optional 
 
 class URL(URLBase):
     is_active: bool
@@ -13,6 +14,7 @@ class URL(URLBase):
 class URLInfo(URL):
     url: str
     admin_url: str
+    qr_code: str = Field(None, description="Base64 encoded QR code image for the URL")
     # This enhances URL by requiring two additional strings, url and admin_url. 
     # You could also add the two strings url and admin_url to URL. 
     # But by adding url and admin_url to the URLInfo subclass, 

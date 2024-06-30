@@ -17,3 +17,7 @@ def create_unique_random_key(db: Session) -> str:
     while crud.get_db_url_by_key(db, key):
         key = create_random_key()
     return key
+
+def is_valid_custom_key(key: str) -> bool:
+    chars = string.ascii_letters + string.digits
+    return all(c in chars for c in key)
