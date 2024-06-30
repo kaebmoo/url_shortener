@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
     host: str = os.getenv('HOST', '127.0.0.1')
     port: int = os.getenv('PORT', 8000)
+    shortener_host: str = os.getenv('SHORTENER_HOST', 'http://127.0.0.1:5000')
 
 
 @lru_cache

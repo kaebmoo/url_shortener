@@ -109,6 +109,7 @@ async def verify_api_key(
     api_key = request.headers.get("X-API-KEY")  # Get API key from headers
     if not api_key:
         raise_api_key(api_key) 
+        
     db_api_key = crud.get_api_key(db, api_key)
     if not db_api_key:
         raise_api_key(api_key)

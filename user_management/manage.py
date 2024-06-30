@@ -12,7 +12,15 @@ from app import create_app, db
 from app.models import Role, User
 from config import Config
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Check and print the environment variable
+config_name = os.getenv('FLASK_CONFIG') or 'default'
+logging.debug(f"Config name: {config_name}")
+
 app = create_app(os.getenv('FLASK_CONFIG') or 'default')
+
 # manager = Manager(app)
 migrate = Migrate(app, db)
 
@@ -96,6 +104,7 @@ def run_worker():
         worker.work()
         # สร้างคิวโดยใช้ connection ของ Redis
         queue = Queue(connection=conn)
+
 
 
 @app.cli.command()

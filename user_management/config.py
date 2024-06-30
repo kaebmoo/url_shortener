@@ -12,7 +12,7 @@ else:
 basedir = os.path.abspath(os.path.dirname(__file__))
 config_file = os.path.join(basedir, 'config.env')
 if os.path.exists(config_file):
-    print('Importing environment from .env file')
+    print('Importing environment from config.env file')
     for line in open(config_file):
         var = line.strip().split('=')
         if len(var) == 2:
@@ -27,6 +27,9 @@ class Config:
         SECRET_KEY = 'SECRET_KEY_ENV_VAR_NOT_SET'
         print('SECRET KEY ENV VAR NOT SET! SHOULD NOT SEE IN PRODUCTION')
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
+
+    # FastAPI
+    FAST_API_HOST = os.environ.get('FAST_API_HOST', 'http://127.0.0.1')
 
     # Email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.sendgrid.net')

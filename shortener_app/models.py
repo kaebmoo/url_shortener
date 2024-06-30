@@ -34,6 +34,11 @@ class APIKey(BaseAPI):
     # created_at = Column(DateTime(timezone=True), server_default=func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
     # updated_at = Column(DateTime(timezone=True), onupdate=func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
 
+class Role(BaseAPI):
+    __tablename__ = "roles"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(64), unique=True)
+
 # ฟังก์ชันนี้จะทำให้แน่ใจว่า updated_at ถูกอัปเดตเมื่อมีการอัปเดตแถว
 @event.listens_for(URL, 'before_update')
 def receive_before_update(mapper, connection, target):
