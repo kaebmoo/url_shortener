@@ -1,4 +1,5 @@
 # shortener_app/main.py
+from typing import Optional
 import requests  # Import for checking website existence
 import secrets
 import validators
@@ -20,6 +21,11 @@ from .config import get_settings
 from .database import SessionLocal, SessionAPI, engine, engine_api
 from . import crud, models, schemas, keygen
 
+
+app = FastAPI()
+
+models.Base.metadata.create_all(bind=engine)
+models.BaseAPI.metadata.create_all(bind=engine_api)
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
     base_url = URL(get_settings().base_url)
@@ -63,12 +69,6 @@ def raise_api_key(api_key: str):
     message = f"API key '{api_key}' is missing or invalid"
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message)
 
-
-app = FastAPI()
-
-models.Base.metadata.create_all(bind=engine)
-models.BaseAPI.metadata.create_all(bind=engine_api)
-
 def normalize_url(url: str, trailing_slash: bool = False) -> str:
     """Normalizes a URL by optionally adding or removing trailing slashes.
 
@@ -102,6 +102,11 @@ def get_api_db():
         yield db
     finally:
         db.close()
+
+def get_optional_api_db():
+    if get_settings().use_api_db:
+        return next(get_api_db())
+    return None
 
 api_key_header = APIKeyHeader(name="X-API-KEY")
 
@@ -175,19 +180,31 @@ def forward_to_target_url(
 def create_url(
     url: schemas.URLBase,
     db: Session = Depends(get_db),
-    api_db: Session = Depends(get_api_db),
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
+    api_db: Optional[Session] = Depends(get_optional_api_db)
 ):
     url.target_url = normalize_url(url.target_url, trailing_slash=True)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
     
-    # ดึง role_id จาก database
-    role_id = crud.get_role_id(api_db, api_key)
+    # ดึง role_id จาก database ถ้ามีการกำหนดให้ใช้งาน
+    role_id = None
+    if api_db:
+        role_id = crud.get_role_id(api_db, api_key)
+        if role_id is None:
+            raise HTTPException(status_code=400, detail="Invalid API key")
+        
+        # ดึง role_name จากฐานข้อมูล Role
+        role_name = crud.get_role_name(api_db, role_id)
+        if role_name is None:
+            raise HTTPException(status_code=400, detail="Role not found")
+        
+    
+    # role_id = crud.get_role_id(api_db, api_key)
     
     if url.custom_key:
-        if role_id not in [2, 3]:
+        if role_id is not None and role_id not in [2, 3]:
             raise_forbidden(message="You do not have permission to use custom keys")
             
         

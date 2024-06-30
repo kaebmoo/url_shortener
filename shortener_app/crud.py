@@ -60,6 +60,12 @@ def get_role_id(db: Session, api_key: str) -> int:
         return api_key_data.role_id
     return None
 
+def get_role_name(api_db: Session, role_id: int) -> str:
+    role = api_db.query(models.Role).filter(models.Role.id == role_id).first()
+    if role:
+        return role.name
+    return None
+
 # def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> bool:
 #     return db.query(models.URL).filter(models.URL.target_url == target_url, models.URL.api_key == api_key, models.URL.is_active).first() is not None
 

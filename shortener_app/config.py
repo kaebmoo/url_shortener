@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     host: str = os.getenv('HOST', '127.0.0.1')
     port: int = os.getenv('PORT', 8000)
     shortener_host: str = os.getenv('SHORTENER_HOST', 'http://127.0.0.1:5000')
+    use_api_db: bool = True  # กำหนดค่าเริ่มต้นให้ใช้ api_db ถ้าไม่ต้องการให้ตั้งเป็น False
 
 
 @lru_cache
