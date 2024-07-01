@@ -6,6 +6,7 @@
         {% include 'partials/_head.html' %}
         {# Any templates that extend this template can set custom_head_tags to add scripts to their page #}
         {% block custom_head_tags %}{% endblock %}
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/app.css') }}">
     </head>
     <body>
       {# Example dropdown menu setup. Uncomment lines to view

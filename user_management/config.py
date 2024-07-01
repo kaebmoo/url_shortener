@@ -29,7 +29,7 @@ class Config:
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
 
     # FastAPI
-    FAST_API_HOST = os.environ.get('FAST_API_HOST', 'http://127.0.0.1')
+    SHORTENER_HOST = os.environ.get('SHORTENER_HOST', 'http://127.0.0.1:8000')
 
     # Email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.sendgrid.net')
@@ -85,6 +85,9 @@ class DevelopmentConfig(Config):
     ASSETS_DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-dev.sqlite'))
+    SQLALCHEMY_BINDS = { 
+        'shortener_db': os.environ.get('DEV_SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener.db'))
+    }
 
     @classmethod
     def init_app(cls, app):
@@ -96,6 +99,9 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-test.sqlite'))
+    SQLALCHEMY_BINDS = { 
+        'shortener_db': os.environ.get('TEST_SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener-test.db'))
+    }
     WTF_CSRF_ENABLED = False
 
     @classmethod
@@ -109,6 +115,9 @@ class ProductionConfig(Config):
     USE_RELOADER = False
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data.sqlite'))
+    SQLALCHEMY_BINDS = { 
+        'shortener_db': os.environ.get('SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener.db'))
+    }
     SSL_DISABLE = (os.environ.get('SSL_DISABLE', 'True') == 'True')
 
     @classmethod

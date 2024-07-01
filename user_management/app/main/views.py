@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, redirect, session, url_for, flash, request
+from flask import Blueprint, render_template, redirect, session, url_for, flash, request, current_app
 from flask_wtf.csrf import CSRFError
+from flask_login import current_user, login_required
 
-from app.models import EditableHTML
+from app.models import EditableHTML, ShortenedURL
 
 main = Blueprint('main', __name__)
 
@@ -14,7 +15,12 @@ def handle_csrf_error(e):
 
 @main.route('/')
 def index():
-    return render_template('main/index.html')
+    if current_user.is_authenticated:
+        user_urls = ShortenedURL.query.filter_by(api_key=current_user.uid, is_active=1).all()
+
+        shortener_host = current_app.config['SHORTENER_HOST']
+        return render_template('main/index.html', user_urls=user_urls, shortener_host=shortener_host)
+    return render_template('main/index.html', shortener_host=current_app.config['SHORTENER_HOST'])
 
 
 @main.route('/about')

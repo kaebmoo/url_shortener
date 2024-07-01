@@ -5,3 +5,4 @@ module (as opposed to just their python files)
 
 from .user import *  # noqa
 from .miscellaneous import *  # noqa
+from .shortened_url import *  # noqa  # Add this line to import the ShortenedURL model

@@ -19,3 +19,6 @@ table.selectable tr:hover {
   cursor: pointer !important;
 }
 
+.ui.horizontal.scroll {
+  overflow-x: auto;
+}

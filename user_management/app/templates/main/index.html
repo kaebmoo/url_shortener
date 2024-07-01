@@ -1,9 +1,38 @@
 {% extends 'layouts/base.html' %}
 
 {% block content %}
-    <div class="ui text container">
+    <div class="ui container">
       <h1>Hello {% if not (current_user.is_authenticated) %} world {% else %} {{ current_user.full_name() }} {% endif %},</h1>
 
+      {% if current_user.is_authenticated %}
+      <h2>Your Shortened URLs</h2>
+        <div class="ui segment">
+          <div class="ui scrolling container">
+            <table class="ui celled table">
+              <thead>
+                <tr>
+                  <th>Target URL</th>
+                  <th>Shortened URL</th>
+                  <th>Secret Key</th>
+                  <th>Clicks</th>
+                  <th>Created At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for url in user_urls %}
+                  <tr>
+                    <td>{{ url.target_url }}</td>
+                    <td><a href="{{ shortener_host }}/{{ url.key }}" target="_blank">{{ shortener_host }}/{{ url.key }}</a></td>
+                    <td>{{ url.secret_key }}</td>
+                    <td>{{ url.clicks }}</td>
+                    <td>{{ url.created_at }}</td> 
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
         <p>This is <a href="http://hack4impact.org">Hack4Impact</a>'s web application template. We'll use this as a
         foundation for each of our <a href="http://flask.pocoo.org">Flask</a> projects. The goal is to reduce the work
         necessary to get a new project off the ground, by providing boilerplate code (such as account management
@@ -12,7 +41,7 @@
         called <a href="http://semantic-ui.com">Semantic UI</a>. Much of this code is appropriated from the examples
         in Miguel Grinberg's book, <a href="http://flaskbook.com"><em>Flask Web Development</em></a>.</p>
 
-        <p>Form</p>
+      {% endif %}
         <!---
         <p>{{ lipsum(6) }}</p>
         -->

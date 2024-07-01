@@ -9,7 +9,7 @@ from flask import Flask, cli
 from redis import Redis
 from rq import Connection, Queue, Worker
 from app import create_app, db
-from app.models import Role, User
+from app.models import Role, User, ShortenedURL
 from config import Config
 
 import logging
@@ -27,7 +27,7 @@ migrate = Migrate(app, db)
 
 @app.shell_context_processor
 def make_shell_context():
-    return {'db': db, 'User': User, 'Role': Role}
+    return {'db': db, 'User': User, 'Role': Role, 'ShortenedURL': ShortenedURL}
 
 
 @app.cli.command("test")
