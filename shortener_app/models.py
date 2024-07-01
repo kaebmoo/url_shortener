@@ -19,6 +19,7 @@ class URL(Base):
     api_key = Column(String, index=True)  # เพิ่มฟิลด์นี้เพื่อเก็บ API key
     created_at = Column(DateTime(timezone=True), server_default=func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
+    is_checked = Column(Boolean, default=False, nullable=True)
 
 class APIKey(BaseAPI):
     __tablename__ = "users"

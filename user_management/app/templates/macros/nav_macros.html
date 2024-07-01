@@ -25,7 +25,10 @@
     ]%}
     {% set user = [] %}
     {% if current_user.is_authenticated %}
-    {# เพิ่มบรรทัดนี้เพื่อเช็คว่ามี role ของ user หรือไม่ #}
+      {# Add the Shorten link for authenticated users #}
+      {% set endpoints = endpoints + [('shorten.shorten_url', 'Shorten', 'linkify')] %}
+      
+      {# เพิ่มบรรทัดนี้เพื่อเช็คว่ามี role ของ user หรือไม่ #}
       {% if current_user.role %} 
         {% set user = ([(current_user.role.index + '.index', current_user.role.name + ' Dashboard', 'user')]) %}
       {% endif %}

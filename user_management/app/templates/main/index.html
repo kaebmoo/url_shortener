@@ -11,21 +11,21 @@
             <table class="ui celled table">
               <thead>
                 <tr>
-                  <th>Target URL</th>
-                  <th>Shortened URL</th>
-                  <th>Secret Key</th>
-                  <th>Clicks</th>
-                  <th>Created At</th>
+                  <th style="width: 40%;">Target URL</th>
+                  <th style="width: 25%;">Shortened URL</th>
+                  <th style="width: 15%;">Secret Key</th>
+                  <th style="width: 5%;">Clicks</th>
+                  <th style="width: 15%;">Created At</th>
                 </tr>
               </thead>
               <tbody>
                 {% for url in user_urls %}
                   <tr>
-                    <td>{{ url.target_url }}</td>
-                    <td><a href="{{ shortener_host }}/{{ url.key }}" target="_blank">{{ shortener_host }}/{{ url.key }}</a></td>
-                    <td>{{ url.secret_key }}</td>
-                    <td>{{ url.clicks }}</td>
-                    <td>{{ url.created_at }}</td> 
+                    <td style="width: 40%;">{{ url.target_url }}</td>
+                    <td style="width: 25%;"><a href="{{ shortener_host }}/{{ url.key }}" target="_blank">{{ shortener_host }}/{{ url.key }}</a></td>
+                    <td style="width: 15%;">{{ url.secret_key }}</td>
+                    <td style="width: 5%;">{{ url.clicks }}</td>
+                    <td style="width: 15%;">{{ url.created_at }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
