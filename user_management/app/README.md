@@ -1,4 +1,4 @@
-```markdown
+```
 # URL Shortener with User Management
 
 This project is a URL shortener web application with user management functionalities, built using Flask. It includes features such as user registration, login, email notifications, and URL shortening.
