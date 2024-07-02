@@ -112,7 +112,7 @@ This project is adapted from the [flask-base](https://github.com/hack4impact/fla
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/hack4impact/flask-base/blob/master/LICENSE.md) file for details.
 
 ## Additional Resources
 
