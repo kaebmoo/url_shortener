@@ -1,5 +1,3 @@
-Below is the `README.md` file for the code provided in your `user_management/app` folder:
-
 ```markdown
 # URL Shortener with User Management
 
