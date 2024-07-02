@@ -1,4 +1,4 @@
-```
+
 # URL Shortener with User Management
 
 This project is a URL shortener web application with user management functionalities, built using Flask. It includes features such as user registration, login, email notifications, and URL shortening.
@@ -124,5 +124,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [Flask-Mail](https://pythonhosted.org/Flask-Mail/)
 - [Flask-RQ2](https://flask-rq2.readthedocs.io/en/latest/)
 - [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/)
-- [Flask-WTF](https://flask-wtf.readthedocs.io/en/stable/)
-```
+- [Flask-WTF](https://flask-wtf.readthedocs.io/en/stable/) 
