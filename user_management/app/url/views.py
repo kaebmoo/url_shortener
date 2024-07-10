@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, redirect, session, url_for, flash, request
+from flask_login import login_required
 from app.url.forms import URLShortenForm
 import requests
 from flask_wtf.csrf import CSRFError
@@ -38,6 +39,7 @@ def generate_qr_code(data):
     return img_str
 
 @shorten.route('/shorten', methods=['GET', 'POST'])
+@login_required
 def shorten_url():
     message = None  # กำหนดค่าเริ่มต้น
     short_url = None  # กำหนดค่าเริ่มต้น

@@ -1,11 +1,11 @@
 # shortener_app/models.py
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, event
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, String, DateTime, event
 from sqlalchemy.sql import func
 from sqlalchemy import event
 from sqlalchemy.orm import mapper
 
-from .database import Base, BaseAPI
+from .database import Base, BaseAPI, BaseBlacklist
 
 class URL(Base):
     __tablename__ = "urls"  # ชื่อ table ใน sqlite
@@ -39,6 +39,15 @@ class Role(BaseAPI):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True)
     name = Column(String(64), unique=True)
+
+class Blacklist(BaseBlacklist):
+    __tablename__ = "url"
+    id = Column(Integer, primary_key=True)                  # primary key
+    url = Column(String(500), unique=True, nullable=False)  # URL ที่ต้องการตรวจสอบ
+    category = Column(String(100), nullable=False)          # ประเภทของ URL
+    date_added = Column(Date, nullable=False)               # วันที่เพิ่ม URL เข้า blacklist
+    reason = Column(String(500), nullable=False)            # เหตุผลที่ URL ถูกบล็อค
+    status = Column(Boolean, nullable=True)                 # สถานะของ URL (true/false)
 
 # ฟังก์ชันนี้จะทำให้แน่ใจว่า updated_at ถูกอัปเดตเมื่อมีการอัปเดตแถว
 @event.listens_for(URL, 'before_update')

@@ -78,3 +78,9 @@ def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> model
         models.URL.api_key == api_key, 
         models.URL.is_active
     ).first()  # This will return the URL object itself or None
+
+# เพิ่มใน shortener_app/crud.py
+def is_url_in_blacklist(db: Session, url: str) -> bool:
+    """Checks if a URL is in the blacklist."""
+    return db.query(models.Blacklist).filter(models.Blacklist.url == url).first() is not None
+

@@ -18,7 +18,7 @@ import base64
 from urllib.parse import urlparse
 
 from .config import get_settings
-from .database import SessionLocal, SessionAPI, engine, engine_api
+from .database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
 from . import crud, models, schemas, keygen
 
 
@@ -26,6 +26,7 @@ app = FastAPI()
 
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
+models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
     base_url = URL(get_settings().base_url)
@@ -79,7 +80,9 @@ def normalize_url(url: str, trailing_slash: bool = False) -> str:
     Returns:
         The normalized URL.
     """
-
+    # Strip leading and trailing whitespace from the URL
+    url = url.strip()
+    
     parsed_url = urlparse(url)
     path = parsed_url.path.rstrip("/")  # Remove all trailing slashes from the path
     
@@ -98,6 +101,13 @@ def get_db():
 # ฟังก์ชันสำหรับการเชื่อมต่อกับฐานข้อมูล API keys
 def get_api_db():
     db = SessionAPI()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_blacklist_db():
+    db = SessionBlacklist()
     try:
         yield db
     finally:
@@ -181,12 +191,17 @@ def create_url(
     url: schemas.URLBase,
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key),
-    api_db: Optional[Session] = Depends(get_optional_api_db)
+    api_db: Optional[Session] = Depends(get_optional_api_db),
+    blacklist_db: Session = Depends(get_blacklist_db)
 ):
-    url.target_url = normalize_url(url.target_url, trailing_slash=True)
+    url.target_url = normalize_url(url.target_url, trailing_slash=False)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
+
+    # ตรวจสอบว่า URL อยู่ใน blacklist หรือไม่
+    if crud.is_url_in_blacklist(blacklist_db, url.target_url):
+        raise_forbidden(message="The provided URL is blacklisted and cannot be shortened.")
     
     # ดึง role_id จาก database ถ้ามีการกำหนดให้ใช้งาน
     role_id = None
