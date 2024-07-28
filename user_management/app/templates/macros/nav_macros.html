@@ -25,14 +25,29 @@
     ]%}
     {% set user = [] %}
     {% if current_user.is_authenticated %}
-      {# Add the Shorten link for authenticated users #}
+      {# Add the Shorten link for authenticated users, shorten.shorten_url ( shorten = blueprint shorten_url = function() ) #}
       {% set endpoints = endpoints + [('shorten.shorten_url', 'Shorten', 'linkify')] %}
       
       {# เพิ่มบรรทัดนี้เพื่อเช็คว่ามี role ของ user หรือไม่ #}
+      {# remark ไว้ก่อน
       {% if current_user.role %} 
         {% set user = ([(current_user.role.index + '.index', current_user.role.name + ' Dashboard', 'user')]) %}
       {% endif %}
+      #}
+
+      {# ตรวจสอบ permission โดยใช้ current_user.can() #}
+      {% if current_user.can(0x01) %} 
+        {% set user = user + [('main.user', 'User Dashboard', 'user')] %}
+      {% endif %}
+      {% if current_user.can(0x02) %} 
+        {% set user = user + [('main.vip', 'VIP User Dashboard', 'vip')] %}
+      {% endif %}
+      {% if current_user.can(0xff) %}
+        {% set user = user + [('admin.index', 'Admin Dashboard', 'admin')] %}
+      {% endif %}
+    
     {% endif %} 
+
     {{ render_menu_items( endpoints +  user ) }}
 {% endmacro %}
 

@@ -16,12 +16,29 @@ def handle_csrf_error(e):
 @main.route('/')
 def index():
     if current_user.is_authenticated:
-        user_urls = ShortenedURL.query.filter_by(api_key=current_user.uid, is_active=1).all()
+        user_urls = ShortenedURL.query.filter(ShortenedURL.api_key==current_user.uid, ShortenedURL.is_active != 0).all()
 
         shortener_host = current_app.config['SHORTENER_HOST']
         return render_template('main/index.html', user_urls=user_urls, shortener_host=shortener_host)
     return render_template('main/index.html', shortener_host=current_app.config['SHORTENER_HOST'])
 
+@main.route('/user')
+def user():
+    if current_user.is_authenticated:
+        user_urls = ShortenedURL.query.filter(ShortenedURL.api_key==current_user.uid, ShortenedURL.is_active != 0).all()
+
+        shortener_host = current_app.config['SHORTENER_HOST']
+        return render_template('main/user.html', user_urls=user_urls, shortener_host=shortener_host)
+    return render_template('main/user.html', shortener_host=current_app.config['SHORTENER_HOST'])
+
+@main.route('/vip')
+def vip():
+    if current_user.is_authenticated:
+        user_urls = ShortenedURL.query.filter(ShortenedURL.api_key==current_user.uid, ShortenedURL.is_active != 0).all()
+
+        shortener_host = current_app.config['SHORTENER_HOST']
+        return render_template('main/user.html', user_urls=user_urls, shortener_host=shortener_host)
+    return render_template('main/user.html', shortener_host=current_app.config['SHORTENER_HOST'])
 
 @main.route('/about')
 def about():

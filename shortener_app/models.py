@@ -20,6 +20,7 @@ class URL(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
     is_checked = Column(Boolean, default=False, nullable=True)
+    status = Column(String) # เก็บสถานะว่าเป็น url อันตรายหรือไม่ เช่น safe, danger, no info
 
 class APIKey(BaseAPI):
     __tablename__ = "users"

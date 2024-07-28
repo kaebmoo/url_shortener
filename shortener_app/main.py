@@ -82,7 +82,7 @@ def normalize_url(url: str, trailing_slash: bool = False) -> str:
     """
     # Strip leading and trailing whitespace from the URL
     url = url.strip()
-    
+
     parsed_url = urlparse(url)
     path = parsed_url.path.rstrip("/")  # Remove all trailing slashes from the path
     
@@ -217,6 +217,7 @@ def create_url(
         
     
     # role_id = crud.get_role_id(api_db, api_key)
+    # ได้ role_id มาก็ขึ้นอยู่กับว่าจะเอาไปใช้ทำอะไรต่อ
     
     if url.custom_key:
         if role_id is not None and role_id not in [2, 3]:
@@ -227,7 +228,7 @@ def create_url(
             raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
         if len(url.custom_key) > 15:
             raise_bad_request(message="Your provided custom key is too long. It should not exceed 15 characters.")
-        if crud.get_db_url_by_key(db, url.custom_key):
+        if crud.get_db_url_by_customkey(db, url.custom_key):
             raise_already_used(message=f"The custom key '{url.custom_key}' is already in use. Please choose a different key.")
     
     # ตรวจสอบว่ามี  URL Target นี้อยู่แล้วหรือไม่สำหรับ API key นี้

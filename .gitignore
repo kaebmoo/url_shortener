@@ -14,3 +14,4 @@ shortener.db
 /shortener_app/alembic
 /user_management/alembic
 user_management/alembic.ini
+shortener_app/test_create_url.txt

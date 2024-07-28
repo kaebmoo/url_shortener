@@ -10,6 +10,7 @@ from flask_rq2 import RQ
 from rq import Queue
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
+from flask_socketio import SocketIO
 
 from app.assets import app_css, app_js, vendor_css, vendor_js
 from config import config as Config
@@ -47,7 +48,7 @@ def create_app(config):
     csrf.init_app(app)
     compress.init_app(app)
     RQ(app)
-    
+    socketio = SocketIO(app)
 
 
     # Register Jinja template functions
@@ -83,5 +84,8 @@ def create_app(config):
 
     from .url import shorten as shorten_blueprint
     app.register_blueprint(shorten_blueprint)
+
+    # Add socketio to app context
+    app.socketio = socketio
 
     return app

@@ -16,7 +16,12 @@ from wtforms.validators import (
     EqualTo,
     InputRequired,
     Length,
+    DataRequired,
+    URL as URLValidator,
 )
+
+from wtforms import FileField
+from flask_wtf.file import FileAllowed, FileRequired
 
 from app import db
 from app.models import Role, User
@@ -76,3 +81,14 @@ class NewUserForm(InviteUserForm):
     password2 = PasswordField('Confirm password', validators=[InputRequired()])
 
     submit = SubmitField('Create')
+
+class AddURLForm(FlaskForm):
+    url = StringField('URL', validators=[DataRequired(), URLValidator()])
+    category = StringField('Category', validators=[DataRequired()])
+    reason = StringField('Reason', validators=[DataRequired()])
+    source = StringField('Source', validators=[DataRequired()])
+    submit = SubmitField('Add URL')
+
+class ImportForm(FlaskForm):
+    file = FileField('File', validators=[FileRequired(), FileAllowed(['csv', 'json'], 'CSV and JSON files only!')])
+    submit = SubmitField('Import')

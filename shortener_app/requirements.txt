@@ -1,0 +1,7 @@
+fastapi
+qrcodegen
+starlette
+uvicorn
+Pillow
+validators
+alembic
