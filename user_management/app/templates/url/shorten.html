@@ -13,6 +13,9 @@
             } %}
             {{ f.begin_form(form, flashes) }}
                 {{ f.render_form_field(form.original_url) }}
+                {% if current_user.is_vip_or_admin() %}
+                    {{ f.render_form_field(form.custom_key) }}  <!-- Add this line -->
+                {% endif %}
                 {{ f.form_message(flashes['error'], header='Something went wrong.', class='error') }}
                 {{ f.form_message(flashes['success'], header='Success!', class='success') }}
                 {{ f.render_form_field(form.submit) }}

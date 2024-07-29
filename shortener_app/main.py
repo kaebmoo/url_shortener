@@ -232,6 +232,8 @@ def create_url(
             raise_already_used(message=f"The custom key '{url.custom_key}' is already in use. Please choose a different key.")
     
     # ตรวจสอบว่ามี  URL Target นี้อยู่แล้วหรือไม่สำหรับ API key นี้
+    # ต้องทำเพิ่มกรณีที่มีการ custom key shorten url ให้มีการซ้ำได้ แต่ custom key ต้องไม่ซ้ำ
+    
     existing_url = crud.is_url_existing_for_key(db, url.target_url, api_key)
     if existing_url:
         base_url = get_settings().base_url

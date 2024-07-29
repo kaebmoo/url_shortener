@@ -21,12 +21,14 @@ mail = Mail()
 db = SQLAlchemy()
 csrf = CSRFProtect()
 compress = Compress()
+rq = RQ()
 
 # Set up Flask-Login
 login_manager = LoginManager()
 login_manager.session_protection = 'basic'
 login_manager.login_view = 'account.login'
 
+socketio = SocketIO()  # Initialize SocketIO
 
 def create_app(config):
     app = Flask(__name__)
@@ -47,8 +49,10 @@ def create_app(config):
     login_manager.init_app(app)
     csrf.init_app(app)
     compress.init_app(app)
-    RQ(app)
-    socketio = SocketIO(app)
+    
+    # socketio = SocketIO(app)
+    socketio.init_app(app, async_mode='gevent')  # eventlet
+    rq.init_app(app)
 
 
     # Register Jinja template functions

@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, redirect, session, url_for, flash, request
-from flask_login import login_required
+from flask import Blueprint, render_template, redirect, session, url_for, flash, request, current_app
+from flask_login import login_required, current_user
 from app.url.forms import URLShortenForm
 import requests
 from flask_wtf.csrf import CSRFError
@@ -48,6 +48,8 @@ def shorten_url():
     form = URLShortenForm()
     if form.validate_on_submit():
         original_url = form.original_url.data
+        custom_key = form.custom_key.data if current_user.is_vip_or_admin() else None  # Check if user is VIP or admin
+
         headers = {
             'accept': 'application/json',
             'Content-Type': 'application/json',
@@ -56,8 +58,11 @@ def shorten_url():
         data = {
             'target_url': original_url
         }
+        if custom_key:  # Only add custom key if it exists
+            data['custom_key'] = custom_key
         try:
-            response = requests.post('http://127.0.0.1:8000/url', headers=headers, json=data)
+            shortener_host = current_app.config['SHORTENER_HOST']
+            response = requests.post(shortener_host + '/url', headers=headers, json=data)
             data = response.json()
             if response.status_code == 200:
                 short_url = data.get('url', 'No URL returned')

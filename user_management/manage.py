@@ -8,12 +8,14 @@ import click
 from flask import Flask, cli
 from redis import Redis
 from rq import Connection, Queue, Worker
+from rq.exceptions import NoSuchJobError   # Import the exception
 from app import create_app, db
 from app.models import Role, User, ShortenedURL
 from config import Config
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
+
 
 # Check and print the environment variable
 config_name = os.getenv('FLASK_CONFIG') or 'default'
@@ -123,3 +125,4 @@ def format():
 if __name__ == '__main__':
     # manager.run()
     app.run(debug=True)
+

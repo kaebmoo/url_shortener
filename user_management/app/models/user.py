@@ -80,6 +80,10 @@ class User(UserMixin, db.Model):
 
     def is_admin(self):
         return self.can(Permission.ADMINISTER)
+    
+    def is_vip_or_admin(self):
+        return self.can(Permission.VIP) or self.can(Permission.ADMINISTER)
+    
 
     @property
     def password(self):
