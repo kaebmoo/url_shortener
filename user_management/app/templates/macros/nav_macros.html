@@ -36,14 +36,13 @@
       #}
 
       {# ตรวจสอบ permission โดยใช้ current_user.can() #}
-      {% if current_user.can(0x01) %} 
-        {% set user = user + [('main.user', 'User Dashboard', 'user')] %}
-      {% endif %}
-      {% if current_user.can(0x02) %} 
-        {% set user = user + [('main.vip', 'VIP User Dashboard', 'vip')] %}
-      {% endif %}
-      {% if current_user.can(0xff) %}
+      {% if current_user.role.name == 'Administrator' %}
+        {% set user = user + [('main.vip', 'VIP Dashboard', 'vip')] %}
         {% set user = user + [('admin.index', 'Admin Dashboard', 'admin')] %}
+      {% elif current_user.role.name == 'VIP' %}
+        {% set user = user + [('main.vip', 'VIP Dashboard', 'vip')] %}
+      {% elif current_user.role.name == 'User' %}
+        {% set user = user + [('main.user', 'User Dashboard', 'user')] %}
       {% endif %}
     
     {% endif %} 
