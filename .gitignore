@@ -15,3 +15,5 @@ shortener.db
 /user_management/alembic
 user_management/alembic.ini
 shortener_app/test_create_url.txt
+user_management/SBG_20230811.pdf
+user_management/app/nt_sms.py

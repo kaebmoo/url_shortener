@@ -57,6 +57,12 @@ class Config:
 
     # INFOBIP
     INFOBIP = os.environ.get('INFOBIP') 
+    NT_SMS_HOST = os.environ.get('NT_SMS_HOST')
+    NT_SMS_API = os.environ.get('NT_SMS_API')
+    NT_SMS_USER = os.environ.get('NT_SMS_USER')
+    NT_SMS_PASS = os.environ.get('NT_SMS_PASS')
+    NT_SMS_SENDER = os.environ.get('NT_SMS_SENDER')
+
 
     REDIS_URL = os.getenv('REDISTOGO_URL', 'http://localhost:6379')
 

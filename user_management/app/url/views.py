@@ -53,8 +53,29 @@ def shorten_url():
         headers = {
             'accept': 'application/json',
             'Content-Type': 'application/json',
-            'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ
+            'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone
         }
+
+        # Check URL count for the user
+        try:
+            shortener_host = current_app.config['SHORTENER_HOST']
+            response = requests.get(shortener_host + '/user/info', headers=headers)
+            data = response.json()
+            if response.status_code == 200:
+                url_count = data.get('url_count', 0)
+                if url_count >= 50 and not current_user.is_vip_or_admin():
+                    flash('You have reached the limit of 50 URLs. Please upgrade to VIP or Admin for unlimited access.', 'warning')
+                    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+            else:
+                flash('Failed to retrieve URL count.', 'danger')
+                return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+        except requests.exceptions.ConnectionError:
+            flash('Failed to connect to the server. Please try again later.', 'error')
+            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+        except requests.exceptions.RequestException as req_err:
+            flash(f'An error occurred: {req_err}', 'error')
+            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+
         data = {
             'target_url': original_url
         }

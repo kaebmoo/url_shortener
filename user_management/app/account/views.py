@@ -364,6 +364,7 @@ def verify_otp():
             phone_number = session.get('phone_number')
             password = session.get('password')
             uid = uuid.uuid4().hex
+            session['uid'] = uid
             user = User(
                 first_name=first_name,
                 last_name=last_name,

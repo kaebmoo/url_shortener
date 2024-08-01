@@ -252,6 +252,18 @@ def create_url(
     db_url = crud.create_db_url(db=db, url=url, api_key=api_key)
     return get_admin_info(db_url)
 
+@app.get("/user/info", tags=["info"])
+async def get_url_count(
+    api_key: str = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    # Query the count of URLs created with the given API key
+    url_count = db.query(models.URL).filter(models.URL.api_key == api_key).count()
+
+    # Return the count as a JSON response
+    return JSONResponse(content={"url_count": url_count}, status_code=200)
+
+
 @app.get(
     "/admin/{secret_key}",
     name="administration info",
