@@ -37,14 +37,14 @@
                         <td style="width: 10%;" class="updated-at" data-datetime="{{ url.updated_at }}">{{ url.updated_at }}</td>
                         <td style="width: 5%;">{{ status.upper() }}</td>
                         <td style="width: 15%;">
-                            <div class="ui buttons">
-                                <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}">
+                            <div class="ui buttons" style="margin-bottom: 10px;">
+                                <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Copy URL to clipboard">
                                     <i class="copy icon"></i>
                                 </button>
-                                <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}">
+                                <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
-                                <form method="post" action="{{ url_for('main.user') }}" class="delete-form">
+                                <form method="post" action="{{ url_for('main.user') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ delete_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
                                     <button type="submit" name="delete_submit" class="ui icon button delete-button">
@@ -53,7 +53,7 @@
                                 </form>
                             </div>
                             <div class="qr-code-display" style="display:none; margin-top:10px;">
-                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 100px; max-height: 100px;">
+                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 70px; max-height: 70px;">
                                 <a href="" download="qrcode.png" class="download-qr-code">Download QR</a>
                             </div>
                         </td>

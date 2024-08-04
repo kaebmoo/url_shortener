@@ -13,10 +13,10 @@
                     <tr>
                         <th style="width: 25%;">Target URL</th>
                         <th style="width: 20%;">Shortened URL</th>
-                        <th style="width: 15%;">Secret Key</th>
-                        <th style="width: 5%;">Clicks</th>
-                        <th style="width: 15%;">Created At</th>
-                        <th style="width: 15%;">Updated At</th>
+                        {# <th style="width: 5%;">Secret Key</th> #}
+                        <th style="width: 10%;">Clicks</th>
+                        <th style="width: 10%;">Created At</th>
+                        <th style="width: 5%;">Updated At</th>
                         <th style="width: 5%;">Status</th>
                         <th style="width: 15%;">Actions</th>
                     </tr>
@@ -33,20 +33,21 @@
                             {{ shortener_host }}/{{ url.key }}
                             {% endif %}
                         </td>
-                        <td style="width: 15%;">{{ url.secret_key }}</td>
-                        <td style="width: 5%;">{{ url.clicks }}</td>
-                        <td style="width: 15%;" class="created-at" data-datetime="{{ url.created_at }}">{{ url.created_at }}</td>
-                        <td style="width: 15%;" class="updated-at" data-datetime="{{ url.updated_at }}">{{ url.updated_at }}</td>
+                        {# <td style="width: 5%;">{{ url.secret_key }}</td> #}
+                        <td style="width: 10%;">{{ url.clicks }}</td>
+                        <td style="width: 10%;" class="created-at" data-datetime="{{ url.created_at }}">{{ url.created_at }}</td>
+                        <td style="width: 5%;" class="updated-at" data-datetime="{{ url.updated_at }}">{{ url.updated_at }}</td>
                         <td style="width: 5%;">{{ status.upper() }}</td>
                         <td style="width: 15%;">
-                            <div class="ui buttons">
-                                <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}">
+                            <div class="ui buttons" style="margin-bottom: 10px;">
+                                <!-- Added style="margin-right: 5px;" to create space between buttons -->
+                                <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Copy URL to clipboard">
                                     <i class="copy icon"></i>
                                 </button>
-                                <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}">
+                                <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
-                                <form method="post" action="{{ url_for('main.vip') }}" class="delete-form">
+                                <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ delete_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
                                     <button type="submit" name="delete_submit" class="ui icon button delete-button">
@@ -55,7 +56,7 @@
                                 </form>
                             </div>
                             <div class="qr-code-display" style="display:none; margin-top:10px;">
-                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 100px; max-height: 100px;">
+                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 75px; max-height: 75px;">
                                 <a href="" download="qrcode.png" class="download-qr-code">Download QR</a>
                             </div>
                         </td>
