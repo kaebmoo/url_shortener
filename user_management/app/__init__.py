@@ -87,7 +87,7 @@ def create_app(config):
     app.register_blueprint(admin_blueprint, url_prefix='/admin')
 
     from .url import shorten as shorten_blueprint
-    app.register_blueprint(shorten_blueprint)
+    app.register_blueprint(shorten_blueprint, url_prefix='/url')
 
     # Add socketio to app context
     app.socketio = socketio

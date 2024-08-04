@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, session, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, session, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
 from app.url.forms import URLShortenForm
 import requests
@@ -37,6 +37,30 @@ def generate_qr_code(data):
     img.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
+
+@shorten.route('/generate_qr_code')
+def generate_qr_code_endpoint():
+    data = request.args.get('data')
+    if data:
+        qr_code = generate_qr_code(data)
+        return jsonify({'qr_code': qr_code})
+    return jsonify({'error': 'Missing data parameter'}), 400
+
+@shorten.route('/admin/<secret_key>')
+@login_required
+def delete_url(secret_key):
+    shortener_host = current_app.config['SHORTENER_HOST']
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': session.get('uid')  # Assuming you are passing the API key in the session
+    }
+    response = requests.delete(f'{shortener_host}/admin/{secret_key}', headers=headers)
+    if response.status_code == 200:
+        flash('URL deleted successfully', 'success')
+    else:
+        flash('Failed to delete URL', 'danger')
+    return redirect(url_for('shorten.shorten_url'))
 
 @shorten.route('/shorten', methods=['GET', 'POST'])
 @login_required
