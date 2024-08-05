@@ -88,7 +88,7 @@ def shorten_url():
             if response.status_code == 200:
                 url_count = data.get('url_count', 0)
                 if url_count >= 50 and not current_user.is_vip_or_admin():
-                    flash('You have reached the limit of 50 URLs. Please upgrade to VIP or Admin for unlimited access.', 'warning')
+                    flash('You have reached the limit of 50 URLs. Please upgrade to VIP Plan for unlimited access.', 'warning')
                     return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
             else:
                 flash('Failed to retrieve URL count.', 'danger')
@@ -112,7 +112,10 @@ def shorten_url():
             if response.status_code == 200:
                 short_url = data.get('url', 'No URL returned')
                 message = data.get('message', 'Successfully created')
-                flash(f'{message}', 'success')
+                if message == 'A short link for this website already exists.':
+                    flash(f'{message}', 'warning')
+                else:
+                    flash(f'{message}', 'success')
                 qr_code_base64 = generate_qr_code(short_url)
 
                 # if 'persistent_messages' not in session:

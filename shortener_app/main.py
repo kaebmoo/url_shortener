@@ -258,7 +258,7 @@ async def get_url_count(
     db: Session = Depends(get_db)
 ):
     # Query the count of URLs created with the given API key
-    url_count = db.query(models.URL).filter(models.URL.api_key == api_key).count()
+    url_count = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).count()
 
     # Return the count as a JSON response
     return JSONResponse(content={"url_count": url_count}, status_code=200)
