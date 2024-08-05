@@ -112,16 +112,19 @@ def shorten_url():
             if response.status_code == 200:
                 short_url = data.get('url', 'No URL returned')
                 message = data.get('message', 'Successfully created')
-                if message == 'A short link for this website already exists.':
-                    flash(f'{message}', 'warning')
-                else:
-                    flash(f'{message}', 'success')
+                flash(f'{message}: {short_url}', 'success')
                 qr_code_base64 = generate_qr_code(short_url)
 
                 # if 'persistent_messages' not in session:
                 #     session['persistent_messages'] = []
                 # session['persistent_messages'] = message
                 # session.modified = True  # เพื่อให้แน่ใจว่า session ถูกบันทึก
+            elif response.status_code == 409:
+                # status_code 409 "A short link for this website already exists."
+                short_url = data.get('url', 'No URL returned')
+                message = data.get('message','')
+                qr_code_base64 = generate_qr_code(short_url)
+                flash(f'{message}', 'warning')
             elif response.status_code == 400:
                 message = data.get('detail', '')
                 flash('Error 400 Bad Request', 'error')

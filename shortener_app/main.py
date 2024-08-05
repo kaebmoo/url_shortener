@@ -247,7 +247,7 @@ def create_url(
             # "qr_code": f"data:image/png;base64,{qr_code_base64}",
             "message": f"A short link for this website already exists."
         }
-        return JSONResponse(content=url_data, status_code=200) 
+        return JSONResponse(content=url_data, status_code=409) 
 
     db_url = crud.create_db_url(db=db, url=url, api_key=api_key)
     return get_admin_info(db_url)

@@ -80,42 +80,80 @@
     {% endif %}
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.copy-button').forEach(button => {
-        button.addEventListener('click', function () {
-            const url = this.getAttribute('data-url');
-            navigator.clipboard.writeText(url).then(() => {
-                alert('Copied to clipboard: ' + url);
+    <script>
+        function convertUTCToLocalTime(utcTime, timeZone) {
+            // แปลงเวลาจากรูปแบบ 'YYYY-MM-DD HH:MM:SS' เป็น Date object
+            const [datePart, timePart] = utcTime.split(' ');
+            const [year, month, day] = datePart.split('-');
+            const [hour, minute, second] = timePart.split(':');
+            const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+            
+            // แปลงเวลาเป็นเวลาท้องถิ่นตาม timezone ที่กำหนด
+            const options = {
+                timeZone: timeZone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false  // กำหนดรูปแบบเวลาเป็น 24 ชั่วโมง
+            };
+            const localDate = utcDate.toLocaleString('en-US', options);
+            return localDate;
+        }
+
+        window.onload = function() {
+            const timeZone = 'Asia/Bangkok';  // ตั้งค่า timezone ที่ต้องการ
+            const createdAts = document.querySelectorAll('.created-at');  // ค้นหา element ที่มีคลาส created-at
+            const updatedAts = document.querySelectorAll('.updated-at');  // ค้นหา element ที่มีคลาส updated-at
+
+            createdAts.forEach(function(element) {
+                const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
+                element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
+            });
+
+            updatedAts.forEach(function(element) {
+                const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
+                element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
+            });
+        };
+        
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.copy-button').forEach(button => {
+                button.addEventListener('click', function () {
+                    const url = this.getAttribute('data-url');
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert('Copied to clipboard: ' + url);
+                    });
+                });
+            });
+
+            document.querySelectorAll('.qr-button').forEach(button => {
+                button.addEventListener('click', function () {
+                    const url = this.getAttribute('data-url');
+                    const qrDisplay = this.parentElement.nextElementSibling;
+                    const qrImage = qrDisplay.querySelector('.qr-code-img');
+                    const downloadLink = qrDisplay.querySelector('.download-qr-code');
+
+                    fetch(`/generate_qr_code?data=${encodeURIComponent(url)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            qrImage.src = 'data:image/png;base64,' + data.qr_code;
+                            downloadLink.href = qrImage.src;
+                            qrDisplay.style.display = 'block';
+                        });
+                });
+            });
+
+            document.querySelectorAll('.delete-button').forEach(button => {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    if (confirm('Are you sure you want to delete this URL?')) {
+                        this.closest('form').submit();
+                    }
+                });
             });
         });
-    });
-
-    document.querySelectorAll('.qr-button').forEach(button => {
-        button.addEventListener('click', function () {
-            const url = this.getAttribute('data-url');
-            const qrDisplay = this.parentElement.nextElementSibling;
-            const qrImage = qrDisplay.querySelector('.qr-code-img');
-            const downloadLink = qrDisplay.querySelector('.download-qr-code');
-
-            fetch(`/generate_qr_code?data=${encodeURIComponent(url)}`)
-                .then(response => response.json())
-                .then(data => {
-                    qrImage.src = 'data:image/png;base64,' + data.qr_code;
-                    downloadLink.href = qrImage.src;
-                    qrDisplay.style.display = 'block';
-                });
-        });
-    });
-
-    document.querySelectorAll('.delete-button').forEach(button => {
-        button.addEventListener('click', function (event) {
-            event.preventDefault();
-            if (confirm('Are you sure you want to delete this URL?')) {
-                this.closest('form').submit();
-            }
-        });
-    });
-});
-</script>
+    </script>
 {% endblock %}
