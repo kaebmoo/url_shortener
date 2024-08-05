@@ -36,6 +36,24 @@ def generate_qr_code(data):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
+def get_user_urls():
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': session.get('uid')
+    }
+
+    try:
+        shortener_host = current_app.config['SHORTENER_HOST']
+        response = requests.get(shortener_host + '/user/urls', headers=headers)
+        if response.status_code == 200:
+            user_urls = response.json()
+            return user_urls
+        else:
+            return []
+    except requests.exceptions.RequestException:
+        return []
+
 @main.route('/generate_qr_code')
 @login_required
 def generate_qr_code_endpoint():
@@ -48,7 +66,8 @@ def generate_qr_code_endpoint():
 @main.route('/')
 def index():
     if current_user.is_authenticated:
-        user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active != 0).all()
+        # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
+        user_urls = get_user_urls()
         url_count = len(user_urls)
         
         shortener_host = current_app.config['SHORTENER_HOST']
@@ -76,7 +95,8 @@ def user():
             flash('Failed to delete URL', 'danger')
         return redirect(url_for('main.user'))
 
-    user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active != 0).all()
+    # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
+    user_urls = get_user_urls()
     url_count = len(user_urls)
     shortener_host = current_app.config['SHORTENER_HOST']
     return render_template('main/user.html', user_urls=user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
@@ -100,7 +120,8 @@ def vip():
             flash('Failed to delete URL', 'danger')
         return redirect(url_for('main.vip'))
 
-    user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active != 0).all()
+    # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
+    user_urls = get_user_urls()
     url_count = len(user_urls)
     shortener_host = current_app.config['SHORTENER_HOST']
     return render_template('main/vip.html', user_urls=user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)

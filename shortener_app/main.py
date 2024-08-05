@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status, Security
 from fastapi.security import APIKeyHeader
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.datastructures import URL
@@ -22,7 +23,7 @@ from .database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine
 from . import crud, models, schemas, keygen
 
 
-app = FastAPI()
+app = FastAPI(root_path="")
 
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
@@ -263,6 +264,14 @@ async def get_url_count(
     # Return the count as a JSON response
     return JSONResponse(content={"url_count": url_count}, status_code=200)
 
+@app.get("/user/urls", tags=["user urls"])
+async def get_user_url(
+    api_key: str = Depends(verify_api_key), 
+    db: Session = Depends(get_db)
+):
+    user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).all()
+    user_urls_json = jsonable_encoder(user_urls)
+    return JSONResponse(content=user_urls_json, status_code=200)
 
 @app.get(
     "/admin/{secret_key}",

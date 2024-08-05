@@ -38,6 +38,27 @@ def generate_qr_code(data):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
+def get_user_url_count():
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone
+    }
+
+    try:
+        shortener_host = current_app.config['SHORTENER_HOST']
+        response = requests.get(shortener_host + '/user/info', headers=headers)
+        data = response.json()
+        if response.status_code == 200:
+            url_count = data.get('url_count', 0)
+            return url_count
+        else:
+            return 'Failed to retrieve URL count.'
+    except requests.exceptions.ConnectionError:
+        return 'Failed to connect to the server. Please try again later.'
+    except requests.exceptions.RequestException as req_err:
+        return f'An error occurred: {req_err}'
+    
 @shorten.route('/generate_qr_code')
 def generate_qr_code_endpoint():
     data = request.args.get('data')
@@ -72,7 +93,7 @@ def shorten_url():
     form = URLShortenForm()
     if form.validate_on_submit():
         original_url = form.original_url.data
-        custom_key = form.custom_key.data if current_user.is_vip_or_admin() else None  # Check if user is VIP or admin
+        custom_key = form.custom_key.data if current_user.is_vip_or_admin() else None  # Check if user is VIP or admin 
 
         headers = {
             'accept': 'application/json',

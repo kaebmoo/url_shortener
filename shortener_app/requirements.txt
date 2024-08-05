@@ -5,3 +5,4 @@ uvicorn
 Pillow
 validators
 alembic
+pydantic_settings
