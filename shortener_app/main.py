@@ -9,6 +9,9 @@ from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+
 from sqlalchemy.orm import Session
 from starlette.datastructures import URL
 from fastapi.responses import JSONResponse
@@ -26,6 +29,7 @@ from . import crud, models, schemas, keygen
 
 
 app = FastAPI(root_path="")
+templates = Jinja2Templates(directory="shortener_app/templates")
 
 SECRET_KEY = get_settings().secret_key
 ALGORITHM = "HS256"
@@ -190,13 +194,18 @@ def generate_qr_code(data):
 def read_root():
     return "Welcome to the URL shortener API :)"
 
-@app.post("/api/register_api_key")
+@app.get("/about", response_class=HTMLResponse)
+async def read_about(request: Request):
+    return templates.TemplateResponse("about.html", {"request": request, "title": "About Page"})
+
+
+@app.post("/api/register_api_key", tags=["register api key"])
 def register_api_key(api_key: schemas.APIKeyCreate, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
     result = crud.register_api_key(db, api_key.api_key, api_key.role_id)
     return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
 
 
-@app.post("/api/refresh_token")
+@app.post("/api/refresh_token", tags=["register api key"])
 def refresh_token(refresh_token: str):
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])

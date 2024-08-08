@@ -6,3 +6,6 @@ Pillow
 validators
 alembic
 pydantic_settings
+jwt
+jinja2
+aiofiles
