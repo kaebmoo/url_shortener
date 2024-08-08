@@ -1,35 +1,15 @@
-from flask import (
-    Blueprint,
-    flash,
-    redirect,
-    render_template,
-    request,
-    url_for,
-    session,
-)
-from flask_login import (
-    current_user,
-    login_required,
-    login_user,
-    logout_user,
-)
+from flask import Blueprint, flash, redirect, render_template, request, url_for, session, current_app
+from flask_login import current_user, login_required, login_user, logout_user
 
 from rq import Queue
 # from flask_rq import get_queue <-- deprecated
 
 from app import db
 from app.account.forms import (
-    ChangeEmailForm,
-    ChangePhoneForm,
-    ChangePasswordForm,
-    CreatePasswordForm,
-    LoginForm,
-    RegistrationFormSelect,
-    RegistrationForm,
-    PhoneNumberForm,
-    RequestResetPasswordForm,
-    ResetPasswordForm,
-    OTPForm,
+    ChangeEmailForm, ChangePhoneForm, ChangePasswordForm, 
+    CreatePasswordForm, LoginForm, RegistrationFormSelect, 
+    RegistrationForm, PhoneNumberForm, RequestResetPasswordForm, 
+    ResetPasswordForm, OTPForm, 
 )
 from app.email import send_email
 from app.models import User
@@ -39,20 +19,94 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import uuid
 from email_validator import validate_email, EmailNotValidError
 import phonenumbers
+import jwt
+from datetime import datetime, timedelta, timezone
+import requests
 
 from redis import Redis
-# Create a Redis connection (adjust the parameters accordingly)
-redis_connection = Redis(host='localhost', port=6379, db=0)
+
+account = Blueprint('account', __name__)
+
+
+
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_TOKEN_EXPIRE_DAYS = 30
+
+
+# Create a Redis connection (adjust the parameters accordingly) RQ_DEFAULT_HOST RQ_DEFAULT_PORT
+redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
+
 # Create a queue using the Redis connection
 queue = Queue(connection=redis_connection)
+
 
 # get_queue() is deprecated use queue instead.
 
 # Configure the connection to the queue (e.g., Redis)
 ## queue = Queue(connection='redis://localhost:6379')  # Replace with your actual connection details
 
-account = Blueprint('account', __name__)
+def create_jwt_token():
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": 'user_management',
+        "iat": now,
+        "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    }
+    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm=ALGORITHM)
+    return token
 
+def create_refresh_token():
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": 'user_management',
+        "iat": now,
+        "exp": now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    }
+    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm=ALGORITHM)
+    return token
+
+def refresh_jwt_token():
+    url = current_app.config['SHORTENER_HOST'] + "/api/refresh_token"
+    refresh_token = session.get('refresh_token')
+    payload = {"refresh_token": refresh_token}
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        new_access_token = response.json().get("access_token")
+        session['access_token'] = new_access_token
+        return new_access_token
+    else:
+        # Handle error, such as asking the user to re-login
+        return None
+    
+def send_api_key_to_fastapi(api_key: str, role_id: int):
+    url = current_app.config['SHORTENER_HOST'] + "/api/register_api_key"
+    access_token = session.get('access_token')
+    if not access_token:
+        # Handle the case where access_token is missing, such as re-login
+        return "Access token is missing", 401
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    payload = {"api_key": api_key, "role_id": role_id}
+    response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code == 401:  # Token expired
+        new_access_token = refresh_jwt_token()
+        if new_access_token:
+            headers = {"Authorization": f"Bearer {new_access_token}"}
+            response = requests.post(url, json=payload, headers=headers)
+        else:
+            return "Failed to refresh access token", 401
+
+    if response.status_code == 200:
+        return "API key registered successfully", 200
+    else:
+        return "Failed to register API key", response.status_code
+
+def register_api_key(uid, role_id):
+    api_key = uid
+    message, status = send_api_key_to_fastapi(api_key, role_id)
+    return message, status
 
 @account.route('/login', methods=['GET', 'POST'])
 def login():
@@ -71,6 +125,13 @@ def login():
             flash('You are now logged in. Welcome back!', 'success')
             # เก็บค่า uid, email, phone, หรืออื่น อื่น ใน session
             session['uid'] = user.uid
+
+            access_token = create_jwt_token()
+            refresh_token = create_refresh_token()
+
+            session['access_token'] = access_token
+            session['refresh_token'] = refresh_token
+
             return redirect(request.args.get('next') or url_for('main.index'))
         else:
             flash('Invalid email, phone or password.', 'error')
@@ -150,7 +211,7 @@ def logout():
 def manage():
     """Display a user's account information."""
     try:
-        validate_email(current_user.email)
+        validate_email(current_user.email, check_deliverability=False)
         email_or_phone = current_user.email
         is_email = True
     except EmailNotValidError:
@@ -217,7 +278,7 @@ def change_password():
     """Change an existing user's password."""
     form = ChangePasswordForm()
     try:
-        validate_email(current_user.email)
+        validate_email(current_user.email, check_deliverability=False)
         is_email = True
     except EmailNotValidError:
         # Handle invalid email
@@ -323,6 +384,8 @@ def confirm(token):
         return redirect(url_for('main.index'))
     if current_user.confirm_account(token):
         flash('Your account has been confirmed.', 'success')
+        # send uid as api_key to fastapi here. email register confirmed.
+        register_api_key(current_user.uid, current_user.role_id)
     else:
         flash('The confirmation link is invalid or has expired.', 'error')
     return redirect(url_for('main.index'))
@@ -380,6 +443,9 @@ def verify_otp():
             session.pop('phone_number', None)
             session.pop('password', None)
             flash('Phone number verified and registered successfully!', 'success')
+            # send uid as api_key to fastapi here. phone register confirmed.
+            register_api_key(uid, 1)
+
             return redirect(url_for('main.index'))  # Adjust to your dashboard route
         else:
             flash('Invalid OTP.', 'error')

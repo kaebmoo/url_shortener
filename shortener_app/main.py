@@ -3,7 +3,7 @@ from typing import Optional
 import requests  # Import for checking website existence
 import secrets
 import validators
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header
 from fastapi.security import APIKeyHeader
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
@@ -17,6 +17,8 @@ from PIL import Image
 import io
 import base64
 from urllib.parse import urlparse
+import jwt
+from datetime import datetime, timedelta, timezone
 
 from .config import get_settings
 from .database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
@@ -24,6 +26,11 @@ from . import crud, models, schemas, keygen
 
 
 app = FastAPI(root_path="")
+
+SECRET_KEY = get_settings().secret_key
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
@@ -92,6 +99,7 @@ def normalize_url(url: str, trailing_slash: bool = False) -> str:
 
     return parsed_url._replace(path=path).geturl()
 
+# ฐานข้อมูลหลัก main database
 def get_db():
     db = SessionLocal()
     try:
@@ -119,6 +127,30 @@ def get_optional_api_db():
         return next(get_api_db())
     return None
 
+def verify_jwt_token(authorization: str = Header(None)):
+    try:
+        token = authorization.split(" ")[1]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload["sub"] != "user_management":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid token subject",
+            )
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid token",
+        )
+    
+def create_access_token():
+    now = datetime.now(timezone.utc)
+    payload = {
+        "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        "iat": now,
+        "sub": "user_management"
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    
 api_key_header = APIKeyHeader(name="X-API-KEY")
 
 # Updated API key verification function
@@ -157,6 +189,29 @@ def generate_qr_code(data):
 @app.get("/")
 def read_root():
     return "Welcome to the URL shortener API :)"
+
+@app.post("/api/register_api_key")
+def register_api_key(api_key: schemas.APIKeyCreate, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
+    result = crud.register_api_key(db, api_key.api_key, api_key.role_id)
+    return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
+
+
+@app.post("/api/refresh_token")
+def refresh_token(refresh_token: str):
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload["sub"] != "user_management":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid token subject",
+            )
+        new_access_token = create_access_token()
+        return {"access_token": new_access_token}
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or expired refresh token",
+        )
 
 @app.get("/{url_key}")
 def forward_to_target_url(

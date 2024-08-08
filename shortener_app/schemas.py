@@ -19,3 +19,7 @@ class URLInfo(URL):
     # You could also add the two strings url and admin_url to URL. 
     # But by adding url and admin_url to the URLInfo subclass, 
     # you can use the data in your API without storing it in your database.
+
+class APIKeyCreate(BaseModel):
+    api_key: str
+    role_id: int  # เพิ่ม role_id

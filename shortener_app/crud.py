@@ -60,10 +60,10 @@ def deactivate_db_url_by_secret_key(db: Session, secret_key: str) -> models.URL:
     return db_url
 
 def get_api_key(db: Session, api_key: str) -> models.APIKey:
-    return db.query(models.APIKey).filter(models.APIKey.uid == api_key).first()
+    return db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
 
 def get_role_id(db: Session, api_key: str) -> int:
-    api_key_data = db.query(models.APIKey).filter(models.APIKey.uid == api_key).first()
+    api_key_data = db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
     if api_key_data:
         return api_key_data.role_id
     return None
@@ -92,3 +92,20 @@ def is_url_in_blacklist(db: Session, url: str) -> bool:
     """Checks if a URL is in the blacklist."""
     return db.query(models.Blacklist).filter(models.Blacklist.url == url).first() is not None
 
+def register_api_key(db: Session, api_key: str, role_id: int):
+    existing_api_key = get_api_key(db, api_key)
+    
+    if existing_api_key:
+        if existing_api_key.role_id != role_id:
+            existing_api_key.role_id = role_id
+            db.commit()
+            db.refresh(existing_api_key)
+            return {"message": "API key role updated", "status_code": 200}
+        else:
+            return {"message": "API key already exists with the same role", "status_code": 200}
+    else:
+        new_api_key = models.APIKey(api_key=api_key, role_id=role_id)
+        db.add(new_api_key)
+        db.commit()
+        db.refresh(new_api_key)
+        return {"message": "API key registered", "status_code": 201}
