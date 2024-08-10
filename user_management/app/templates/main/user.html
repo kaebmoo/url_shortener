@@ -5,7 +5,10 @@
     <h1>Hello {% if not (current_user.is_authenticated) %} world {% else %} {{ current_user.full_name() }} {% endif %},</h1>
 
     {% if current_user.is_authenticated %}
-    <h2>Your Shortened URLs ({{ url_count }})</h2>
+    <h2>Your Shortened URLs ({{ url_count }}) -
+        <i class="check circle icon" style="color: green; font-size: 24px;" title="This is safe"></i> = 'SAFE', 
+        <i class="exclamation triangle icon" style="color: red; font-size: 24px;" title="This is dangerous"></i> = 'DANGER'
+    </h2>
     <div class="ui segment">
         <div class="ui scrolling container">
             <table class="ui celled table">
@@ -16,8 +19,8 @@
                         <th style="width: 5%;">Clicks</th>
                         <th style="width: 10%;">Created At</th>
                         <th style="width: 10%;">Updated At</th>
-                        <th style="width: 5%;">Status</th>
-                        <th style="width: 15%;">Actions</th>
+                        <th>Status</th>
+                        <th style="width: 10%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -44,8 +47,16 @@
                         <td style="width: 5%;">{{ url.clicks }}</td>
                         <td style="width: 10%;" class="created-at" data-datetime="{{ url.created_at }}">{{ url.created_at }}</td>
                         <td style="width: 10%;" class="updated-at" data-datetime="{{ url.updated_at }}">{{ url.updated_at }}</td>
-                        <td style="width: 5%;">{{ status.upper() }}</td>
-                        <td style="width: 15%;">
+                        <td style="white-space: nowrap;">
+                            {% if status.upper() == 'SAFE' %}
+                                <i class="check circle icon" style="color: green; font-size: 24px;" title="This is safe"></i>
+                            {% elif status.upper() == 'DANGER' %}
+                                <i class="exclamation triangle icon" style="color: red; font-size: 24px;" title="This is dangerous"></i>
+                            {% else %}
+                                {{ status.upper() }}
+                            {% endif %}
+                        </td>
+                        <td style="width: 10%;">
                             <div class="ui buttons" style="margin-bottom: 10px;">
                                 <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Copy URL to clipboard">
                                     <i class="copy icon"></i>
@@ -63,6 +74,7 @@
                             </div>
                             <div class="qr-code-display" style="display:none; margin-top:10px;">
                                 <img src="" alt="QR Code" class="qr-code-img" style="max-width: 70px; max-height: 70px;">
+                                <br>
                                 <a href="" download="qrcode.png" class="download-qr-code">Download QR</a>
                             </div>
                         </td>
@@ -89,45 +101,59 @@
     {% endif %}
 </div>
 
+<style>
+    /* เพิ่ม CSS นี้ในไฟล์ base.html หรือไฟล์ CSS ที่เกี่ยวข้อง */
+    .ui.celled.table {
+        width: 100%; /* ให้ตารางใช้ความกว้างเต็มของคอนเทนเนอร์ */
+    }
+
+    .ui.celled.table td {
+        max-width: 200px; /* หรือขนาดอื่นๆ ที่เหมาะสม */
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        word-break: break-all; /* อนุญาตให้ตัดคำได้ */
+    }
+</style>
+
     <script>
         function convertUTCToLocalTime(utcTime, timeZone) {
-            // แปลงเวลาจากรูปแบบ 'YYYY-MM-DDTHH:MM:SS' เป็น Date object
-            const [datePart, timePart] = utcTime.split('T');
-            const [year, month, day] = datePart.split('-');
-            const [hour, minute, second] = timePart.split(':');
-            const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-            
-            // แปลงเวลาเป็นเวลาท้องถิ่นตาม timezone ที่กำหนด
-            const options = {
-                timeZone: timeZone,
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false  // กำหนดรูปแบบเวลาเป็น 24 ชั่วโมง
+                // แปลงเวลาจากรูปแบบ 'YYYY-MM-DDTHH:MM:SS' เป็น Date object
+                const [datePart, timePart] = utcTime.split('T');
+                const [year, month, day] = datePart.split('-');
+                const [hour, minute, second] = timePart.split(':');
+                const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+                
+                // แปลงเวลาเป็นเวลาท้องถิ่นตาม timezone ที่กำหนด
+                const options = {
+                    timeZone: timeZone,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false  // กำหนดรูปแบบเวลาเป็น 24 ชั่วโมง
+                };
+                const localDate = utcDate.toLocaleString('en-US', options);
+                return localDate;
+            }
+
+            window.onload = function() {
+                const timeZone = 'Asia/Bangkok';  // ตั้งค่า timezone ที่ต้องการ
+                const createdAts = document.querySelectorAll('.created-at');  // ค้นหา element ที่มีคลาส created-at
+                const updatedAts = document.querySelectorAll('.updated-at');  // ค้นหา element ที่มีคลาส updated-at
+
+                createdAts.forEach(function(element) {
+                    const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
+                    element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
+                });
+
+                updatedAts.forEach(function(element) {
+                    const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
+                    element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
+                });
             };
-            const localDate = utcDate.toLocaleString('en-US', options);
-            return localDate;
-        }
 
-        window.onload = function() {
-            const timeZone = 'Asia/Bangkok';  // ตั้งค่า timezone ที่ต้องการ
-            const createdAts = document.querySelectorAll('.created-at');  // ค้นหา element ที่มีคลาส created-at
-            const updatedAts = document.querySelectorAll('.updated-at');  // ค้นหา element ที่มีคลาส updated-at
-
-            createdAts.forEach(function(element) {
-                const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
-                element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
-            });
-
-            updatedAts.forEach(function(element) {
-                const utcTime = element.getAttribute('data-datetime');  // ดึงค่าเวลาในรูปแบบที่กำหนดจาก attribute data-datetime
-                element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
-            });
-        };
-        
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.copy-button').forEach(button => {
                 button.addEventListener('click', function () {
