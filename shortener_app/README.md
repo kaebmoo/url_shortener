@@ -7,44 +7,65 @@
 
 **Key Updates:**
 
-* **Pydantic V2 Support:** The source code has been enhanced to seamlessly work with pydantic version 2.
-* **Additional Settings:** `pydantic-settings` has been integrated for more configuration options.
-* **Migration Guide:** For detailed information on the migration process, refer to [https://docs.pydantic.dev/latest/migration/](https://docs.pydantic.dev/latest/migration/)
-* **Code Transformation:** The source code has been modified using `bump-pydantic`, with the `config.py` file being the primary target of changes.
+*   **Pydantic V2 Support:** The source code has been enhanced to seamlessly work with pydantic version 2.
+*   **Additional Settings:** `pydantic-settings` has been integrated for more configuration options.
+*   **Migration Guide:** For detailed information on the migration process, refer to [https://docs.pydantic.dev/latest/migration/](https://docs.pydantic.dev/latest/migration/)
+*   **Code Transformation:** The source code has been modified using `bump-pydantic`, with the `config.py` file being the primary target of changes.
+*   **Websocket Integration:** Real-time URL updates are now supported through websockets.
+*   **Asynchronous Page Info Retrieval:** Title and favicon extraction from target URLs is performed asynchronously using `asyncio` and `aiohttp` to improve responsiveness.
+*   **API Key Management:** A new endpoint for registering API keys has been added, along with enhanced API key verification and role-based access control.
+*   **Blacklisting:** URLs can now be blacklisted to prevent shortening of undesired content.
+*   **Custom Key Support:** Users with appropriate permissions can now create short URLs with custom keys.
+*   **User Information:** Endpoints for retrieving the count of shortened URLs and a list of shortened URLs for a specific user have been added.
+*   **Enhanced Error Handling:** Improved HTTP exception handling and informative error messages.
 
 **Running the Live Server**
 
 You have two options for launching the live server:
 
-1. **Using uvicorn:**
+1.  **Using uvicorn:**
 
-   ```bash
-   uvicorn shortener_app.main:app --reload
-   ```
+    ```bash
+    uvicorn shortener_app.main:app --reload
+    ```
 
-2. **With Python3:**
+2.  **With Python3:**
 
-   ```bash
-   python3 -m uvicorn shortener_app.main:app --reload
-   ```
-
-Feel free to ask if you have any further questions or modifications!
+    ```bash
+    python3 -m uvicorn shortener_app.main:app --reload
 
 
-### โค้ดใน `main.py`
+### Key Functions and Endpoints in `main.py`
 
-โค้ดใน `main.py` ของคุณมีการจัดการฟังก์ชันหลักของ API ไว้อย่างดี โดยมีการทำงานดังนี้:
+The `main.py` file serves as the core of your URL shortening API, housing essential functions and endpoints to handle various aspects of the application. Here's a breakdown of its key components:
 
-- **`get_admin_info`**: สร้าง URL ที่เป็นมิตรสำหรับการจัดการข้อมูลลิงค์
-- **`raise_not_found`**: ยกเว้นข้อผิดพลาด 404 เมื่อ URL ไม่พบ
-- **`raise_bad_request`**: ยกเว้นข้อผิดพลาด 400 เมื่อมีการร้องขอที่ไม่ถูกต้อง
-- **`raise_api_key`**: ยกเว้นข้อผิดพลาด 401 เมื่อ API key ไม่ถูกต้องหรือหายไป
-- **`get_db`**: ฟังก์ชันสำหรับการสร้าง session ฐานข้อมูล
-- **`read_root`**: ฟังก์ชันต้อนรับที่ `/` route
-- **`forward_to_target_url`**: ฟังก์ชันสำหรับการเปลี่ยนเส้นทางจาก URL ที่ย่อไปยัง URL เป้าหมาย
-- **`create_url`**: ฟังก์ชันสำหรับสร้าง URL ใหม่
-- **`get_url_info`**: ฟังก์ชันสำหรับดึงข้อมูลการจัดการ URL
-- **`delete_url`**: ฟังก์ชันสำหรับลบ URL
+**Helper Functions**
+
+*   **`get_admin_info`:** Constructs user-friendly URLs for managing shortened link data, incorporating QR code generation.
+*   **`raise_*` functions:** Define custom HTTP exceptions for common error scenarios like 404 (Not Found), 400 (Bad Request), 401 (Unauthorized), and others, enhancing error handling and user experience.
+*   **`get_db`, `get_api_db`, `get_blacklist_db`:** Establish database connections for the main URL data, API keys, and blacklisted URLs, respectively, ensuring proper database interaction.
+*   **`verify_jwt_token`, `create_access_token`, `refresh_token`:** Implement JWT-based authentication and token management for secure user access control.
+*   **`verify_api_key`:** Validates API keys against the database, ensuring only authorized requests are processed.
+*   **`fetch_page_info`, `fetch_page_info_and_update_sync`, `fetch_page_info_and_update`:** Asynchronously retrieve title and favicon information from target URLs using `asyncio` and `aiohttp`, improving application responsiveness.
+*   `normalize_url`: Standardizes URLs by handling trailing slashes consistently.
+*   `generate_qr_code`: Generates QR codes for shortened URLs, enhancing user experience and sharing capabilities.
+*   `custom_openapi`: Customizes the OpenAPI schema for improved documentation and clarity.
+
+**API Endpoints**
+
+*   **`/`:** A simple welcome message endpoint.
+*   **`/about`:** An HTML page providing information about the URL shortener.
+*   **`/api/register_api_key`:** Registers new API keys, enabling secure access to the API.
+*   **`/{url_key}`:** Redirects users from shortened URLs to their original targets, handling potential errors gracefully.
+*   **`/url`:** Creates new shortened URLs, optionally with custom keys (for authorized users), and initiates background tasks to fetch page information.
+*   **`/user/info`:** Provides user-specific information like the count of shortened URLs.
+*   **`/user/urls`:** Retrieves a list of shortened URLs created by a specific user.
+*   **`/admin/{secret_key}`:** Fetches detailed information and management options for a shortened URL based on its secret key.
+*   **`/admin/{secret_key}` (DELETE):** Deletes a shortened URL based on its secret key.
+*   **`/ws/url_update/{secret_key}`:** A websocket endpoint for real-time updates on URL information.
+
+This enhanced description provides a more comprehensive overview of the key functions and endpoints within `main.py`, highlighting their roles in URL shortening, user management, asynchronous operations, and overall API functionality.
+
 
 การนำ title, favicon url เพิ่มในฐานข้อมูล
 
