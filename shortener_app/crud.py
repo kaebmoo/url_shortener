@@ -46,10 +46,10 @@ def get_db_url_by_customkey(db: Session, url_key: str) -> models.URL:
         .first()
     )
 
-def get_db_url_by_secret_key(db: Session, secret_key: str) -> models.URL:
+def get_db_url_by_secret_key(db: Session, secret_key: str, api_key: str) -> models.URL:
     return (
         db.query(models.URL)
-        .filter(models.URL.secret_key == secret_key, models.URL.is_active)
+        .filter(models.URL.secret_key == secret_key, models.URL.api_key == api_key, models.URL.is_active)
         .first()
     )
 
@@ -59,13 +59,15 @@ def update_db_clicks(db: Session, db_url: schemas.URL) -> models.URL:
     db.refresh(db_url)
     return db_url
 
-def deactivate_db_url_by_secret_key(db: Session, secret_key: str) -> models.URL:
-    db_url = get_db_url_by_secret_key(db, secret_key)
+def deactivate_db_url_by_secret_key(db: Session, secret_key: str, api_key: str) -> models.URL:
+    db_url = get_db_url_by_secret_key(db, secret_key, api_key=api_key)
     if db_url:
         db_url.is_active = False
         db.commit()
         db.refresh(db_url)
-    return db_url
+        return db_url
+    else:
+        return None
 
 def get_api_key(db: Session, api_key: str) -> models.APIKey:
     return db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
@@ -118,10 +120,10 @@ def register_api_key(db: Session, api_key: str, role_id: int):
         db.refresh(new_api_key)
         return {"message": "API key registered", "status_code": 201}
     
-def is_url_info_updated(db: Session, secret_key: str) -> bool:
+def is_url_info_updated(db: Session, secret_key: str, api_key: str) -> bool:
     """Check if the title or favicon_url of a URL has been updated."""
 
-    db_url = get_db_url_by_secret_key(db, secret_key)
+    db_url = get_db_url_by_secret_key(db, secret_key, api_key=api_key)
     if db_url is None:
         return False  # URL not found
 
@@ -130,8 +132,8 @@ def is_url_info_updated(db: Session, secret_key: str) -> bool:
 def is_url_owner(db: Session, secret_key: str, api_key: str) -> bool:
     """Check if the user with the given API key is the owner of the URL."""
 
-    db_url = get_db_url_by_secret_key(db, secret_key)
+    db_url = get_db_url_by_secret_key(db, secret_key, api_key=api_key)
     if db_url is None:
         return False  # URL not found
-
-    return db_url.api_key == api_key
+    else:
+        return True

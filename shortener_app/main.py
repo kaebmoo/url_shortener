@@ -204,10 +204,10 @@ async def websocket_endpoint(
     start_time = time.time()
 
     while not is_updated and time.time() - start_time < timeout:
-        is_updated = crud.is_url_info_updated(db, secret_key)
+        is_updated = crud.is_url_info_updated(db, secret_key, api_key)
 
         if is_updated:
-            db_url = crud.get_db_url_by_secret_key(db, secret_key=secret_key)
+            db_url = crud.get_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key)
             url_info = get_admin_info(db_url)
 
             # Decode the JSONResponse body before accessing elements
@@ -456,7 +456,7 @@ def get_url_info(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)  # Added api_key dependency
 ):
-    if db_url := crud.get_db_url_by_secret_key(db, secret_key=secret_key):
+    if db_url := crud.get_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key):
         return get_admin_info(db_url)
     else:
         raise_not_found(request)
@@ -469,7 +469,7 @@ def delete_url(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)  # Added api_key dependency
 ):
-    if db_url := crud.deactivate_db_url_by_secret_key(db, secret_key=secret_key):
+    if db_url := crud.deactivate_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key):
         message = f"Successfully deleted shortened URL for '{db_url.target_url}'"
         return {"detail": message}
     else:
