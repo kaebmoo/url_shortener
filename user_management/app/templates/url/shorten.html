@@ -116,9 +116,11 @@
                 console.error('WebSocket error:', error);
             };
     }
-    {% if url_data.url %}
-        connectWebSocket("{{ url_data.secret_key }}");
-    {% endif %}
-
     </script>
+    {% if url_data.url %}
+        <script>
+            var secretKey = "{{ url_data.secret_key }}";
+            connectWebSocket(secretKey);
+        </script>
+    {% endif %}
 {% endblock %}
