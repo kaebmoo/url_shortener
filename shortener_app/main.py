@@ -3,7 +3,7 @@ from typing import Optional
 import requests  # Import for checking website existence
 import secrets
 import validators
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket
 from fastapi.security import APIKeyHeader
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
@@ -19,9 +19,16 @@ from qrcodegen import QrCode
 from PIL import Image
 import io
 import base64
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 import jwt
 from datetime import datetime, timedelta, timezone
+import asyncio
+import aiohttp
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+import time 
+import json
 
 from .config import get_settings
 from .database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
@@ -56,7 +63,10 @@ def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
         'clicks': db_url.clicks,
         'url': db_url.url,
         'admin_url': db_url.admin_url,
-        'qr_code': f"data:image/png;base64,{qr_code_base64}"
+        'secret_key': db_url.secret_key,
+        'qr_code': f"data:image/png;base64,{qr_code_base64}",
+        'title': db_url.title,
+        'favicon_url': db_url.favicon_url
     }
     return JSONResponse(content=response, status_code=200)
     # return db_url
@@ -170,6 +180,95 @@ async def verify_api_key(
         raise_api_key(api_key)
     else:
         return api_key
+    
+@app.websocket("/ws/url_update/{secret_key}")
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    secret_key: str, 
+    db: Session = Depends(get_db)
+):
+    
+    await websocket.accept()
+
+    # รับข้อความแรกที่มี api_key
+    auth_data = await websocket.receive_json()
+    api_key = auth_data.get("api_key")
+
+    # ตรวจสอบว่าผู้ใช้มีสิทธิ์เข้าถึง URL นี้หรือไม่
+    if not crud.is_url_owner(db, secret_key, api_key): 
+        await websocket.close(code=1008, reason="Unauthorized")  # ปิดการเชื่อมต่อหากไม่ได้รับอนุญาต
+        return
+
+    is_updated = False
+    timeout = 10  # กำหนด timeout เป็น 10 วินาที (หรือค่าที่เหมาะสม)
+    start_time = time.time()
+
+    while not is_updated and time.time() - start_time < timeout:
+        is_updated = crud.is_url_info_updated(db, secret_key)
+
+        if is_updated:
+            db_url = crud.get_db_url_by_secret_key(db, secret_key=secret_key)
+            url_info = get_admin_info(db_url)
+
+            # Decode the JSONResponse body before accessing elements
+            url_info_dict = json.loads(url_info.body.decode("utf-8"))
+
+            await websocket.send_json(url_info_dict)  # Send the content of the JSONResponse 
+
+        await asyncio.sleep(5)
+
+    # ถ้าออกจาก loop แสดงว่าไม่มีการอัพเดต หรือมีการอัพเดตแล้ว ให้ปิดการเชื่อมต่อ
+    await websocket.close()
+    
+async def fetch_page_info(url: str):
+    """Fetch title and favicon from the given URL asynchronously."""
+
+    try:
+        async with aiohttp.ClientSession() as session:  # ใช้ aiohttp สำหรับ async request
+            async with session.get(url, timeout=10) as response:
+                response.raise_for_status()
+                content = await response.text()  # รอรับเนื้อหาของหน้าเว็บ
+
+        soup = BeautifulSoup(content, 'html.parser')
+
+        title = soup.find('title')
+        title = title.text.strip() if title else 'No title found'
+
+        favicon = soup.find('link', rel='icon')
+        if favicon:
+            favicon_url = favicon['href']
+            if not favicon_url.startswith('http'):
+                favicon_url = urljoin(url, favicon_url)
+        else:
+            favicon_url = None
+
+        return title, favicon_url
+
+    except aiohttp.ClientError:  # จัดการ exception จาก aiohttp
+        return None, None
+    
+# Create a thread pool executor (you can adjust the max_workers if needed)
+executor = ThreadPoolExecutor(max_workers=2)
+
+def fetch_page_info_and_update_sync(db_url: models.URL):
+    """Fetch page info and update the database synchronously."""
+    with SessionLocal() as db:
+        loop = asyncio.new_event_loop()  # Create a new event loop
+        asyncio.set_event_loop(loop)  # Set the new event loop as the current one
+        title, favicon_url = loop.run_until_complete(fetch_page_info(db_url.target_url))  # Await the coroutine
+        loop.close()  # Close the event loop
+
+        db_url = db.merge(db_url)
+        db_url.title = title
+        db_url.favicon_url = favicon_url
+        db.commit()
+
+async def fetch_page_info_and_update(db_url: models.URL):
+    """Wrapper to run the synchronous function in a separate thread."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        executor, partial(fetch_page_info_and_update_sync, db_url)
+    )
 
 def generate_qr_code(data):
     qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
@@ -254,6 +353,7 @@ def forward_to_target_url(
 @app.post("/url", response_model=schemas.URLInfo, tags=["url"]) # , dependencies=[Security(verify_api_key)]
 def create_url(
     url: schemas.URLBase,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key),
     api_db: Optional[Session] = Depends(get_optional_api_db),
@@ -310,11 +410,18 @@ def create_url(
             "url": f"{base_url}/{existing_url.key}", 
             "admin_url": f"{base_url}/{existing_url.secret_key}",
             # "qr_code": f"data:image/png;base64,{qr_code_base64}",
+            "secret_key": existing_url.secret_key,
+            "title": existing_url.title,
+            "favicon_url": existing_url.favicon_url,
             "message": f"A short link for this website already exists."
         }
         return JSONResponse(content=url_data, status_code=409) 
 
     db_url = crud.create_db_url(db=db, url=url, api_key=api_key)
+
+    # เพิ่ม task การดึงข้อมูล title และ favicon ลงใน background
+    background_tasks.add_task(fetch_page_info_and_update, db_url)
+
     return get_admin_info(db_url)
 
 @app.get("/user/info", tags=["info"])

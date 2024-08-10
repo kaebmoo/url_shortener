@@ -14,7 +14,10 @@ class URL(URLBase):
 class URLInfo(URL):
     url: str
     admin_url: str
+    secret_key: str
     qr_code: str = Field(None, description="Base64 encoded QR code image for the URL")
+    title: str
+    favicon_url: str
     # This enhances URL by requiring two additional strings, url and admin_url. 
     # You could also add the two strings url and admin_url to URL. 
     # But by adding url and admin_url to the URLInfo subclass, 

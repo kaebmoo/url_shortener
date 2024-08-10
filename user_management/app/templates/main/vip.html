@@ -11,11 +11,11 @@
             <table class="ui celled table">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Target URL</th>
-                        <th style="width: 20%;">Shortened URL</th>
+                        <th style="width: 30%;">Target URL</th>
+                        <th style="width: 25%;">Shortened URL</th>
                         {# <th style="width: 5%;">Secret Key</th> #}
-                        <th style="width: 10%;">Clicks</th>
-                        <th style="width: 10%;">Created At</th>
+                        <th style="width: 5%;">Clicks</th>
+                        <th style="width: 5%;">Created At</th>
                         <th style="width: 5%;">Updated At</th>
                         <th style="width: 5%;">Status</th>
                         <th style="width: 15%;">Actions</th>
@@ -25,8 +25,17 @@
                     {% for url in user_urls %}
                     {% set status = url.status if url.status else '' %}
                     <tr {% if status and status.upper() == 'DANGER' %} style="background-color: #ffcccc;" {% endif %}>
-                        <td style="width: 25%;">{{ url.target_url }}</td>
-                        <td style="width: 20%;">
+                        <td style="width: 30%;">
+                            <div style="display: flex; align-items: center;">
+                                <img src="https://www.google.com/s2/favicons?sz=32&domain={{ url.target_url }}" alt="Favicon" style="margin-right: 8px; width: 32px; height: 32px;">
+                                <small>{{ url.title }}</small>
+                            </div>
+                            <br>
+                            <a href="{{ url.target_url }}" target="_blank" title="{{ url.target_url }}">
+                                {{ url.target_url }}
+                            </a>
+                        </td>
+                        <td style="width: 25%;">
                             {% if status and status.upper() != 'DANGER' %}
                             <a href="{{ shortener_host }}/{{ url.key }}" target="_blank">{{ shortener_host }}/{{ url.key }}</a>
                             {% else %}
@@ -34,8 +43,8 @@
                             {% endif %}
                         </td>
                         {# <td style="width: 5%;">{{ url.secret_key }}</td> #}
-                        <td style="width: 10%;">{{ url.clicks }}</td>
-                        <td style="width: 10%;" class="created-at" data-datetime="{{ url.created_at }}">{{ url.created_at }}</td>
+                        <td style="width: 5%;">{{ url.clicks }}</td>
+                        <td style="width: 5%;" class="created-at" data-datetime="{{ url.created_at }}">{{ url.created_at }}</td>
                         <td style="width: 5%;" class="updated-at" data-datetime="{{ url.updated_at }}">{{ url.updated_at }}</td>
                         <td style="width: 5%;">{{ status.upper() }}</td>
                         <td style="width: 15%;">
@@ -85,8 +94,8 @@
 
     <script>
         function convertUTCToLocalTime(utcTime, timeZone) {
-                // แปลงเวลาจากรูปแบบ 'YYYY-MM-DD HH:MM:SS' เป็น Date object
-                const [datePart, timePart] = utcTime.split(' ');
+                // แปลงเวลาจากรูปแบบ 'YYYY-MM-DDTHH:MM:SS' เป็น Date object
+                const [datePart, timePart] = utcTime.split('T');
                 const [year, month, day] = datePart.split('-');
                 const [hour, minute, second] = timePart.split(':');
                 const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));

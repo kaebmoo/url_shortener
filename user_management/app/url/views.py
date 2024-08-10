@@ -67,7 +67,7 @@ def generate_qr_code_endpoint():
         return jsonify({'qr_code': qr_code})
     return jsonify({'error': 'Missing data parameter'}), 400
 
-@shorten.route('/admin/<secret_key>')
+@shorten.route('/admin/<secret_key>', methods=['DELETE'])
 @login_required
 def delete_url(secret_key):
     shortener_host = current_app.config['SHORTENER_HOST']
@@ -76,16 +76,44 @@ def delete_url(secret_key):
         'Content-Type': 'application/json',
         'X-API-KEY': session.get('uid')  # Assuming you are passing the API key in the session
     }
-    response = requests.delete(f'{shortener_host}/admin/{secret_key}', headers=headers)
-    if response.status_code == 200:
-        flash('URL deleted successfully', 'success')
-    else:
+    try:
+        response = requests.delete(f'{shortener_host}/admin/{secret_key}', headers=headers)
+        if response.status_code == 200:
+            flash('URL deleted successfully', 'success')
+        else:
+            flash('Failed to delete URL', 'danger')
+
+        return redirect(url_for('shorten.shorten_url'))
+    except:
         flash('Failed to delete URL', 'danger')
-    return redirect(url_for('shorten.shorten_url'))
+        return redirect(url_for('shorten.shorten_url'))
+
+@shorten.route('/admin/<secret_key>', methods=['GET'])
+@login_required
+def get_url_info(secret_key):
+    shortener_host = current_app.config['SHORTENER_HOST']
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': session.get('uid')  # Assuming you are passing the API key in the session
+    }
+    try:
+        response = requests.get(f'{shortener_host}/admin/{secret_key}', headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return jsonify({
+                'title': data.get('title', ''),
+                'favicon_url': data.get('favicon_url')
+            })
+        else:
+            return jsonify({'error': f"Failed to retrieve data from FastAPI, status code: {response.status_code}"}), response.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': str(e)}), 500
 
 @shorten.route('/shorten', methods=['GET', 'POST'])
 @login_required
 def shorten_url():
+    url_data = None
     message = None  # กำหนดค่าเริ่มต้น
     short_url = None  # กำหนดค่าเริ่มต้น
     qr_code_base64 = None
@@ -93,6 +121,8 @@ def shorten_url():
     # สร้างข้อความแจ้งจำนวน URL ที่สร้างแล้ว ทั้งภาษาไทยและภาษาอังกฤษ
     url_count_message_th = f"คุณได้สร้าง URL แล้วทั้งหมด {url_count} รายการ"
     url_count_message_en = f"You have created a total of {url_count} URLs"
+    shortener_host = current_app.config['SHORTENER_HOST']
+    api_key = session.get('uid')
 
     form = URLShortenForm()
     if form.validate_on_submit():
@@ -107,24 +137,23 @@ def shorten_url():
 
         # Check URL count for the user
         try:
-            shortener_host = current_app.config['SHORTENER_HOST']
             response = requests.get(shortener_host + '/user/info', headers=headers)
-            data = response.json()
+            info = response.json()
             if response.status_code == 200:
-                url_count = data.get('url_count', 0)
+                url_count = info.get('url_count', 0)
                 url_count_message_en = f"You have created a total of {url_count} URLs"
                 if url_count >= 50 and not current_user.is_vip_or_admin():
                     flash('You have reached the limit of 50 URLs. Please upgrade to VIP Plan for unlimited access.', 'warning')
-                    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+                    return render_template('url/shorten.html', form=form, shortener_host=shortener_host, url_data=url_data, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
             else:
                 flash('Failed to retrieve URL count.', 'danger')
-                return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+                return render_template('url/shorten.html', form=form, shortener_host=shortener_host, url_data=url_data, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
         except requests.exceptions.ConnectionError:
             flash('Failed to connect to the server. Please try again later.', 'error')
-            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+            return render_template('url/shorten.html', form=form, shortener_host=shortener_host, url_data=url_data, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
         except requests.exceptions.RequestException as req_err:
             flash(f'An error occurred: {req_err}', 'error')
-            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+            return render_template('url/shorten.html', form=form, shortener_host=shortener_host, url_data=url_data, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
 
         data = {
             'target_url': original_url
@@ -132,12 +161,11 @@ def shorten_url():
         if custom_key:  # Only add custom key if it exists
             data['custom_key'] = custom_key
         try:
-            shortener_host = current_app.config['SHORTENER_HOST']
             response = requests.post(shortener_host + '/url', headers=headers, json=data)
-            data = response.json()
+            url_data = response.json()
             if response.status_code == 200:
-                short_url = data.get('url', 'No URL returned')
-                message = data.get('message', 'Successfully created')
+                short_url = url_data.get('url', 'No URL returned')
+                message = url_data.get('message', 'Successfully created')
                 flash(f'{message}: {short_url}', 'success')
                 qr_code_base64 = generate_qr_code(short_url)
 
@@ -147,15 +175,15 @@ def shorten_url():
                 # session.modified = True  # เพื่อให้แน่ใจว่า session ถูกบันทึก
             elif response.status_code == 409:
                 # status_code 409 "A short link for this website already exists."
-                short_url = data.get('url', 'No URL returned')
-                message = data.get('message','')
+                short_url = url_data.get('url', 'No URL returned')
+                message = url_data.get('message','')
                 qr_code_base64 = generate_qr_code(short_url)
                 flash(f'{message}', 'warning')
             elif response.status_code == 400:
-                message = data.get('detail', '')
+                message = url_data.get('detail', '')
                 flash('Error 400 Bad Request', 'error')
             else:
-                message = data.get('detail', '')
+                message = url_data.get('detail', '')
                 flash('Failed to shorten URL.', 'danger')
         except requests.exceptions.ConnectionError:
             flash('Failed to connect to the server. Please try again later.', 'error')
@@ -167,6 +195,7 @@ def shorten_url():
             flash(f'An unexpected error occurred: {e}', 'error')
         ## return redirect(url_for('main.shorten'))
     # persistent_messages = session.get('persistent_messages', [])
-    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+    # return render_template('url/shorten.html', form=form, shortener_host=shortener_host, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
+    return render_template('url/shorten.html', form=form, shortener_host=shortener_host, url_data=url_data, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en, api_key=api_key)
     
     

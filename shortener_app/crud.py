@@ -24,6 +24,14 @@ def create_db_url(db: Session, url: schemas.URLBase, api_key: str) -> models.URL
     db.refresh(db_url)
     return db_url
 
+'''def update_db_url_page_info(db: Session, db_url: models.URL, title: str, favicon_url: str):
+    """Update the title and favicon_url of a URL object in the database."""
+
+    db_url.title = title
+    db_url.favicon_url = favicon_url
+    db.commit()
+    db.refresh(db_url)'''
+
 def get_db_url_by_key(db: Session, url_key: str) -> models.URL:
     return (
         db.query(models.URL)
@@ -109,3 +117,21 @@ def register_api_key(db: Session, api_key: str, role_id: int):
         db.commit()
         db.refresh(new_api_key)
         return {"message": "API key registered", "status_code": 201}
+    
+def is_url_info_updated(db: Session, secret_key: str) -> bool:
+    """Check if the title or favicon_url of a URL has been updated."""
+
+    db_url = get_db_url_by_secret_key(db, secret_key)
+    if db_url is None:
+        return False  # URL not found
+
+    return db_url.title is not None or db_url.favicon_url is not None
+
+def is_url_owner(db: Session, secret_key: str, api_key: str) -> bool:
+    """Check if the user with the given API key is the owner of the URL."""
+
+    db_url = get_db_url_by_secret_key(db, secret_key)
+    if db_url is None:
+        return False  # URL not found
+
+    return db_url.api_key == api_key

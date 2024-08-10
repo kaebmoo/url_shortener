@@ -20,14 +20,26 @@
                 {{ f.form_message(flashes['success'], header='Success!', class='success') }}
                 {{ f.render_form_field(form.submit) }}
             {{ f.end_form(form) }}
-            {% if message %}
+            {% if url_data.message %}
                 <div class="ui message">
-                    <p>{{ message }}</p>
+                    <p>{{ url_data.message }}</p>
                 </div>
             {% endif %}
-            {% if short_url %}
+            <p>
+            <div style="display: flex; align-items: center;">
+                {% if url_data.target_url %}
+                    <img id="pageFavicon" src="https://www.google.com/s2/favicons?sz=32&domain={{ url_data.target_url }}" alt="Favicon" style="margin-right: 8px; width: 32px; height: 32px;">
+                {% else %}
+                    <img id="pageFavicon" src="">
+                {% endif %}
+                <div id="pageTitle">
+                    {{ url_data.title }}
+                </div>
+            </div>
+            <p>
+            {% if url_data.url %}
                 <div class="ui action input" style="width: 100%;">
-                    <input type="text" id="shortUrl" value="{{ short_url }}" readonly style="width: 80%;">
+                    <input type="text" id="shortUrl" value="{{ url_data.url }}" readonly style="width: 80%;">
                     <button class="ui button" onclick="copyToClipboard()">Copy</button>
                 </div>
                 <div class="ui message">
@@ -47,5 +59,66 @@
             document.execCommand("copy");
             alert("Copied the URL: " + copyText.value);
         }
+
+        function connectWebSocket(secretKey) {
+            const shortenerHost = "{{ shortener_host }}";  // รับค่า shortener_host จาก Flask
+
+            const wsUrl = `${shortenerHost}/ws/url_update/${secretKey}`; // สร้าง URL สำหรับ WebSocket
+        
+
+            // สร้างการเชื่อมต่อกับ WebSocket
+            const socket = new WebSocket(wsUrl);
+
+            // จัดการเมื่อการเชื่อมต่อสำเร็จ
+            socket.onopen = function(event) {
+                console.log('Connected to WebSocket:', wsUrl);
+                api_key = "{{ api_key }}"
+                socket.send(JSON.stringify({ api_key: api_key }));
+            };
+
+            // จัดการเมื่อได้รับข้อความจากเซิร์ฟเวอร์
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Message from server:', data);
+
+                if (data.title) {
+                    const titleElement = document.querySelector('#pageTitle');
+                    if (titleElement) {
+                        titleElement.innerText = data.title;
+                    } else {
+                        const newTitleElement = document.createElement('div');
+                        newTitleElement.classList.add('ui', 'message');
+                        newTitleElement.innerHTML = `${data.title}`;
+                        document.querySelector('.ui.grid.container').appendChild(newTitleElement);
+                    }
+                }
+
+                if (data.favicon_url) {
+                    const faviconElement = document.querySelector('#pageFavicon');
+                    if (faviconElement) {
+                        faviconElement.src = data.favicon_url;
+                    } else {
+                        const newFaviconElement = document.createElement('div');
+                        newFaviconElement.classList.add('ui', 'message');
+                        newFaviconElement.innerHTML = `<img src="${data.favicon_url}" alt="Favicon"/>`;
+                        document.querySelector('.ui.grid.container').appendChild(newFaviconElement);
+                    }
+                }
+            };
+
+            // จัดการเมื่อการเชื่อมต่อถูกปิด
+            socket.onclose = function(event) {
+                console.log('WebSocket connection closed:', event);
+            };
+
+            // จัดการข้อผิดพลาด
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+    }
+    {% if url_data.url %}
+        connectWebSocket("{{ url_data.secret_key }}");
+    {% endif %}
+
     </script>
 {% endblock %}

@@ -9,3 +9,4 @@ pydantic_settings
 jwt
 jinja2
 aiofiles
+beautifulsoup4

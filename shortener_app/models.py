@@ -21,6 +21,26 @@ class URL(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
     is_checked = Column(Boolean, default=False, nullable=True)
     status = Column(String) # เก็บสถานะว่าเป็น url อันตรายหรือไม่ เช่น safe, danger, no info
+    title = Column(String(255)) # title page
+    favicon_url = Column(String(255)) # favicon url
+
+class URL2Check(Base):
+    __tablename__ = "urls_to_check" # สำหรับ โปรแกรม ตรวจสอบดึงข้อมูลไปอ่านเพื่อทำการ scan 
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String)
+
+class scan_records(Base):
+    __tablename__ = "scan_records"  # เก็บข้อมูลการ scan 
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime(timezone=True), onupdate=func.now()) 
+    url = Column(String)
+    status = Column(String)
+    scan_type = Column(String)
+    result = Column(String)
+    submission_type = Column(String)
+    scan_id = Column(String)
+    sha256 = Column(String)
 
 class APIKey(BaseAPI):
     __tablename__ = "api_key"
