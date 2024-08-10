@@ -103,3 +103,22 @@ This enhanced description provides a more comprehensive overview of the key func
 **การทำงานร่วมกัน**
 
 เมื่อมีการสร้าง short URL ใหม่ ฟังก์ชัน `create_url` จะเพิ่ม `fetch_page_info_and_update` ลงใน `BackgroundTasks` ทำให้ FastAPI เรียกใช้ฟังก์ชันนี้ในเบื้องหลังหลังจากส่ง response กลับไปให้ client แล้ว `fetch_page_info_and_update` จะเรียกใช้ `fetch_page_info_and_update_sync` ใน thread pool เพื่อดึงข้อมูล title และ favicon และอัปเดตฐานข้อมูล ทำให้การสร้าง short URL ไม่ถูกบล็อกโดยการดึงข้อมูล และแอปพลิเคชันยังคงตอบสนองต่อผู้ใช้ได้อย่างรวดเร็ว
+
+
+**`nginx.conf`**
+
+```
+location / {
+                # rewrite ^/api/v1/(.*)$ /$1 break;
+                proxy_pass http://127.0.0.1:8000;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
+		# รองรับ WebSocket
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "Upgrade";
+        }
+```
