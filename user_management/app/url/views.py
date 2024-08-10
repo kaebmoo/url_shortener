@@ -42,7 +42,7 @@ def get_user_url_count():
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone
+        'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone น่าจะแก้ไขแล้ว
     }
 
     try:
@@ -89,6 +89,10 @@ def shorten_url():
     message = None  # กำหนดค่าเริ่มต้น
     short_url = None  # กำหนดค่าเริ่มต้น
     qr_code_base64 = None
+    url_count = get_user_url_count()
+    # สร้างข้อความแจ้งจำนวน URL ที่สร้างแล้ว ทั้งภาษาไทยและภาษาอังกฤษ
+    url_count_message_th = f"คุณได้สร้าง URL แล้วทั้งหมด {url_count} รายการ"
+    url_count_message_en = f"You have created a total of {url_count} URLs"
 
     form = URLShortenForm()
     if form.validate_on_submit():
@@ -108,18 +112,19 @@ def shorten_url():
             data = response.json()
             if response.status_code == 200:
                 url_count = data.get('url_count', 0)
+                url_count_message_en = f"You have created a total of {url_count} URLs"
                 if url_count >= 50 and not current_user.is_vip_or_admin():
                     flash('You have reached the limit of 50 URLs. Please upgrade to VIP Plan for unlimited access.', 'warning')
-                    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+                    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
             else:
                 flash('Failed to retrieve URL count.', 'danger')
-                return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+                return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
         except requests.exceptions.ConnectionError:
             flash('Failed to connect to the server. Please try again later.', 'error')
-            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
         except requests.exceptions.RequestException as req_err:
             flash(f'An error occurred: {req_err}', 'error')
-            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+            return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
 
         data = {
             'target_url': original_url
@@ -162,6 +167,6 @@ def shorten_url():
             flash(f'An unexpected error occurred: {e}', 'error')
         ## return redirect(url_for('main.shorten'))
     # persistent_messages = session.get('persistent_messages', [])
-    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64)
+    return render_template('url/shorten.html', form=form, message=message, short_url=short_url, qr_code_base64=qr_code_base64, url_count_message=url_count_message_en)
     
     

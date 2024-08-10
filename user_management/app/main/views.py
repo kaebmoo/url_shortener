@@ -69,9 +69,11 @@ def index():
         # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
         user_urls = get_user_urls()
         url_count = len(user_urls)
+        # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
+        sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
         
         shortener_host = current_app.config['SHORTENER_HOST']
-        return render_template('main/index.html', user_urls=user_urls, shortener_host=shortener_host, url_count=url_count)
+        return render_template('main/index.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count)
     return render_template('main/index.html', shortener_host=current_app.config['SHORTENER_HOST'])
 
 @main.route('/user', methods=['GET', 'POST'])
@@ -98,8 +100,11 @@ def user():
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
+    # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
+    sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    
     shortener_host = current_app.config['SHORTENER_HOST']
-    return render_template('main/user.html', user_urls=user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
+    return render_template('main/user.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
 
 @main.route('/vip', methods=['GET', 'POST'])
 @login_required
@@ -123,8 +128,11 @@ def vip():
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
+    # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
+    sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+
     shortener_host = current_app.config['SHORTENER_HOST']
-    return render_template('main/vip.html', user_urls=user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
+    return render_template('main/vip.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
 
 @main.route('/about')
 def about():
