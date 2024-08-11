@@ -15,23 +15,16 @@ from app.email import send_email
 from app.models import User
 from app.utils import generate_otp
 from app.sms import send_otp
+from app.apicall import register_api_key, create_jwt_token, create_refresh_token
+
 from werkzeug.security import check_password_hash, generate_password_hash
 import uuid
 from email_validator import validate_email, EmailNotValidError
 import phonenumbers
-import jwt
-from datetime import datetime, timedelta, timezone
-import requests
 
 from redis import Redis
 
 account = Blueprint('account', __name__)
-
-
-
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
-REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 
 # Create a Redis connection (adjust the parameters accordingly) RQ_DEFAULT_HOST RQ_DEFAULT_PORT
@@ -45,68 +38,6 @@ queue = Queue(connection=redis_connection)
 
 # Configure the connection to the queue (e.g., Redis)
 ## queue = Queue(connection='redis://localhost:6379')  # Replace with your actual connection details
-
-def create_jwt_token():
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": 'user_management',
-        "iat": now,
-        "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    }
-    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm=ALGORITHM)
-    return token
-
-def create_refresh_token():
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": 'user_management',
-        "iat": now,
-        "exp": now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    }
-    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm=ALGORITHM)
-    return token
-
-def refresh_jwt_token():
-    url = current_app.config['SHORTENER_HOST'] + "/api/refresh_token"
-    refresh_token = session.get('refresh_token')
-    payload = {"refresh_token": refresh_token}
-    response = requests.post(url, json=payload)
-    if response.status_code == 200:
-        new_access_token = response.json().get("access_token")
-        session['access_token'] = new_access_token
-        return new_access_token
-    else:
-        # Handle error, such as asking the user to re-login
-        return None
-    
-def send_api_key_to_fastapi(api_key: str, role_id: int):
-    url = current_app.config['SHORTENER_HOST'] + "/api/register_api_key"
-    access_token = session.get('access_token')
-    if not access_token:
-        # Handle the case where access_token is missing, such as re-login
-        return "Access token is missing", 401
-
-    headers = {"Authorization": f"Bearer {access_token}"}
-    payload = {"api_key": api_key, "role_id": role_id}
-    response = requests.post(url, json=payload, headers=headers)
-    
-    if response.status_code == 401:  # Token expired
-        new_access_token = refresh_jwt_token()
-        if new_access_token:
-            headers = {"Authorization": f"Bearer {new_access_token}"}
-            response = requests.post(url, json=payload, headers=headers)
-        else:
-            return "Failed to refresh access token", 401
-
-    if response.status_code == 200:
-        return "API key registered successfully", 200
-    else:
-        return "Failed to register API key", response.status_code
-
-def register_api_key(uid, role_id):
-    api_key = uid
-    message, status = send_api_key_to_fastapi(api_key, role_id)
-    return message, status
 
 @account.route('/login', methods=['GET', 'POST'])
 def login():
@@ -125,12 +56,8 @@ def login():
             flash('You are now logged in. Welcome back!', 'success')
             # เก็บค่า uid, email, phone, หรืออื่น อื่น ใน session
             session['uid'] = user.uid
-
             access_token = create_jwt_token()
-            refresh_token = create_refresh_token()
-
             session['access_token'] = access_token
-            session['refresh_token'] = refresh_token
 
             return redirect(request.args.get('next') or url_for('main.index'))
         else:
@@ -477,6 +404,9 @@ def join_from_invite(user_id, token):
             new_user.password = form.password.data
             db.session.add(new_user)
             db.session.commit()
+            # send api_key, role_id to fastapi
+            register_api_key(api_key=new_user.uid, role_id=new_user.role_id)
+            #
             flash('Your password has been set. After you log in, you can '
                   'go to the "Your Account" page to review your account '
                   'information and settings.', 'success')

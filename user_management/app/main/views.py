@@ -2,13 +2,11 @@ from flask import Blueprint, render_template, redirect, session, url_for, flash,
 from flask_wtf.csrf import CSRFError
 from flask_login import current_user, login_required
 import requests
-from io import BytesIO
-import base64
-from PIL import Image
-from qrcodegen import QrCode
 
 from app.models import EditableHTML, ShortenedURL
 from app.main.forms import DeleteURLForm
+from app.utils import generate_qr_code
+from app.apicall import get_user_urls
 
 main = Blueprint('main', __name__)
 
@@ -16,43 +14,6 @@ main = Blueprint('main', __name__)
 @main.errorhandler(CSRFError)
 def handle_csrf_error(e):
     return render_template('errors/400.html'), 400
-
-def generate_qr_code(data):
-    qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
-    size = qr.get_size()
-    scale = 5
-    img_size = size * scale
-    img = Image.new('1', (img_size, img_size), 'white')
-
-    for y in range(size):
-        for x in range(size):
-            if qr.get_module(x, y):
-                for dy in range(scale):
-                    for dx in range(scale):
-                        img.putpixel((x * scale + dx, y * scale + dy), 0)
-
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return img_str
-
-def get_user_urls():
-    headers = {
-        'accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')
-    }
-
-    try:
-        shortener_host = current_app.config['SHORTENER_HOST']
-        response = requests.get(shortener_host + '/user/urls', headers=headers)
-        if response.status_code == 200:
-            user_urls = response.json()
-            return user_urls
-        else:
-            return []
-    except requests.exceptions.RequestException:
-        return []
 
 @main.route('/generate_qr_code')
 @login_required

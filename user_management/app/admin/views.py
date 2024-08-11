@@ -20,9 +20,9 @@ from io import StringIO, BytesIO
 import os
 from sqlalchemy.exc import IntegrityError
 from dateutil.parser import parse as parse_date
+import uuid
 
 from rq import Queue
-from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 
@@ -38,7 +38,7 @@ from app.admin.forms import (
 from app.decorators import admin_required
 from app.email import send_email
 from app.models import EditableHTML, Role, User, URL
-
+from app.apicall import deactivate_api_key, register_api_key
 
 admin = Blueprint('admin', __name__)
 
@@ -223,14 +223,18 @@ def new_user():
     """Create a new user."""
     form = NewUserForm()
     if form.validate_on_submit():
+        uid = uuid.uuid4().hex
         user = User(
+            confirmed=True,
             role=form.role.data,
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             email=form.email.data,
+            uid=uid,
             password=form.password.data)
         db.session.add(user)
         db.session.commit()
+        register_api_key(uid, role_id=form.role.data.id)  # Use role_id as the ID
         flash('User {} successfully created'.format(user.full_name()),
               'form-success')
     return render_template('admin/new_user.html', form=form)
@@ -243,11 +247,13 @@ def invite_user():
     """Invites a new user to create an account and set their own password."""
     form = InviteUserForm()
     if form.validate_on_submit():
+        uid = uuid.uuid4().hex
         user = User(
             role=form.role.data,
             first_name=form.first_name.data,
             last_name=form.last_name.data,
-            email=form.email.data)
+            email=form.email.data,
+            uid=uid)
         db.session.add(user)
         db.session.commit()
         token = user.generate_confirmation_token()
@@ -329,11 +335,32 @@ def change_account_type(user_id):
         user.role = form.role.data
         db.session.add(user)
         db.session.commit()
+        # must send to fastapi api_key, role_id
+        api_key = user.uid
+        role_id = user.role.id
+        message, status = register_api_key(api_key, role_id)
+        if status == 200:
+            pass
+        else:
+            flash(message, 'error')
+        # 
         flash('Role for user {} successfully changed to {}.'.format(
             user.full_name(), user.role.name), 'form-success')
     return render_template('admin/manage_user.html', user=user, form=form)
 
+@admin.route('/user/<int:user_id>/apikey-delete')
+@login_required
+@admin_required
+def delete_api_key(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    api_key = user.uid
+    # call fastapi for deactivate api_key
+    message, status = deactivate_api_key(api_key)
+    flash(message + ': {}'.format(status), 'info')
+    return redirect(url_for('admin.registered_users'))
 
+
+# สร้าง form เพื่อจะลบผู้ใช้งาน
 @admin.route('/user/<int:user_id>/delete')
 @login_required
 @admin_required
@@ -344,7 +371,7 @@ def delete_user_request(user_id):
         abort(404)
     return render_template('admin/manage_user.html', user=user)
 
-
+# ถ้ายืนยัน ก็จะส่งมาให้ลบออก
 @admin.route('/user/<int:user_id>/_delete')
 @login_required
 @admin_required
@@ -355,9 +382,16 @@ def delete_user(user_id):
               'administrator to do this.', 'error')
     else:
         user = User.query.filter_by(id=user_id).first()
-        db.session.delete(user)
-        db.session.commit()
-        flash('Successfully deleted user %s.' % user.full_name(), 'success')
+        if user is None:
+            flash('User not found. The user may have already been deleted.', 'error')
+        else:
+            try:    
+                db.session.delete(user)
+                db.session.commit()
+                flash('Successfully deleted user %s.' % user.full_name(), 'success')
+            except Exception as e:
+                db.session.rollback()  # ย้อนกลับการเปลี่ยนแปลงถ้าเกิดข้อผิดพลาด
+                flash('An error occurred while trying to delete the user. Please try again.', 'error')
     return redirect(url_for('admin.registered_users'))
 
 

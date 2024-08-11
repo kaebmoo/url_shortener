@@ -298,13 +298,18 @@ async def read_about(request: Request):
     return templates.TemplateResponse("about.html", {"request": request, "title": "About Page"})
 
 
-@app.post("/api/register_api_key", tags=["register api key"])
+@app.post("/api/register_api_key", tags=["api key"])
 def register_api_key(api_key: schemas.APIKeyCreate, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
     result = crud.register_api_key(db, api_key.api_key, api_key.role_id)
     return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
 
+@app.post("/api/deactivate_api_key", tags=["api key"])
+def deactivate_api_key(api_key: schemas.APIKeyDelete, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
+    result = crud.deactivate_api_key(db=db, api_key=api_key.api_key)
+    return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
 
-@app.post("/api/refresh_token", tags=["register api key"])
+
+@app.post("/api/refresh_token", tags=["api key"])
 def refresh_token(refresh_token: str):
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -435,7 +440,7 @@ async def get_url_count(
     # Return the count as a JSON response
     return JSONResponse(content={"url_count": url_count}, status_code=200)
 
-@app.get("/user/urls", tags=["user urls"])
+@app.get("/user/urls", tags=["info"])
 async def get_user_url(
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db)

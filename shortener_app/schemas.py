@@ -26,3 +26,7 @@ class URLInfo(URL):
 class APIKeyCreate(BaseModel):
     api_key: str
     role_id: int  # เพิ่ม role_id
+
+class APIKeyDelete(BaseModel):
+    api_key: str
+    

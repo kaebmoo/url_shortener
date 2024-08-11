@@ -4,6 +4,10 @@ from wtforms.widgets import HiddenInput
 import sys
 import random
 
+import base64
+from PIL import Image
+from qrcodegen import QrCode
+from io import BytesIO
 
 # from wtforms.compat import text_type
 if sys.version_info[0] >= 3:
@@ -53,3 +57,21 @@ class CustomSelectField(Field):
 def generate_otp():
     return random.randint(1000, 9999)
 
+def generate_qr_code(data):
+    qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
+    size = qr.get_size()
+    scale = 5
+    img_size = size * scale
+    img = Image.new('1', (img_size, img_size), 'white')
+
+    for y in range(size):
+        for x in range(size):
+            if qr.get_module(x, y):
+                for dy in range(scale):
+                    for dx in range(scale):
+                        img.putpixel((x * scale + dx, y * scale + dy), 0)
+
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return img_str

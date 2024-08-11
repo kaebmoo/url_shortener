@@ -120,6 +120,17 @@ def register_api_key(db: Session, api_key: str, role_id: int):
         db.refresh(new_api_key)
         return {"message": "API key registered", "status_code": 201}
     
+def deactivate_api_key(db: Session, api_key: str):
+    existing_api_key = get_api_key(db, api_key)
+    if existing_api_key:
+        db.delete(existing_api_key)
+        db.commit()
+        return {"message": "API key deleted", "status_code": 200}
+    else:
+        return {"message": "API key not found", "status_code": 404}
+
+
+    
 def is_url_info_updated(db: Session, secret_key: str, api_key: str) -> bool:
     """Check if the title or favicon_url of a URL has been updated."""
 
