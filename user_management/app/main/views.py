@@ -25,9 +25,9 @@ def convert_scan_results_to_localtime(scan_results):
     for index, result in enumerate(scan_results_list):
         print(f"Processing item {index}: {result} (type: {type(result)})")
         if isinstance(result, dict) and 'timestamp' in result:
-            original_timestamp = result['timestamp']
+            # original_timestamp = result['timestamp']
             result['timestamp'] = convert_to_localtime(result['timestamp'])
-            print(f"Converted {original_timestamp} to {result['timestamp']}")
+            # print(f"Converted {original_timestamp} to {result['timestamp']}")
         else:
             print(f"Item {index} does not have a timestamp or is not a dictionary.")
 
@@ -68,6 +68,10 @@ def user():
     url_count = len(user_urls)
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
     sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    # Convert 'created_at' and 'updated_at' to local time
+    for url in sorted_user_urls:
+        url['created_at'] = convert_to_localtime(url['created_at'])
+        url['updated_at'] = convert_to_localtime(url['updated_at'])
 
     print("Form data:", request.form)  # Debug print
     shortener_host = current_app.config['SHORTENER_HOST']
@@ -129,8 +133,13 @@ def vip():
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
+    
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
     sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    # Convert 'created_at' and 'updated_at' to local time
+    for url in sorted_user_urls:
+        url['created_at'] = convert_to_localtime(url['created_at'])
+        url['updated_at'] = convert_to_localtime(url['updated_at'])
 
     if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
         url_secret_key = request.form['url_secret_key']

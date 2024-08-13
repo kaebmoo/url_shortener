@@ -80,18 +80,15 @@ def generate_qr_code(data):
     return img_str
 
 def convert_to_localtime(utc_timestamp):
-    # Access the timezone from the current app's config
-    timezone_str = current_app.config.get('TIMEZONE', 'Asia/Bangkok')
-    
-    # Convert the UTC timestamp to a datetime object
-    utc_time = datetime.strptime(utc_timestamp, '%Y-%m-%dT%H:%M:%S')
-    
-    # Set the timezone to UTC
-    utc_time = utc_time.replace(tzinfo=pytz.utc)
-    
-    # Convert to the desired timezone
-    local_timezone = pytz.timezone(timezone_str)
-    local_time = utc_time.astimezone(local_timezone)
-    
-    # Format the datetime object as a string
-    return local_time.strftime('%Y-%m-%d %H:%M:%S')
+    if utc_timestamp is None:
+        return ''  # or return a default value like an empty string or a specific date
+    try:
+        timezone_str = current_app.config.get('TIMEZONE', 'Asia/Bangkok')
+        utc_time = datetime.strptime(utc_timestamp, '%Y-%m-%dT%H:%M:%S')
+        utc_time = utc_time.replace(tzinfo=pytz.utc)
+        local_timezone = pytz.timezone(timezone_str)
+        local_time = utc_time.astimezone(local_timezone)
+        return local_time.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        print(f"Error converting time: {e}")
+        return utc_timestamp  # return the original timestamp if there's an error
