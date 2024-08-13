@@ -26,7 +26,7 @@
                 <tbody>
                     {% for url in user_urls %}
                     {% set status = url.status if url.status else '' %}
-                    <tr {% if status and status.upper() == 'DANGER' %} style="background-color: #ffcccc;" {% endif %}>
+                    <tr id="row-{{ url.key }}" {% if status and status.upper() == 'DANGER' %} style="background-color: #ffcccc;" {% endif %}>
                         <td style="width: 35%;">
                             <div style="display: flex; align-items: center;">
                                 <img src="https://www.google.com/s2/favicons?sz=32&domain={{ url.target_url }}" alt="Favicon" style="margin-right: 8px; width: 32px; height: 32px;">
@@ -64,7 +64,7 @@
                                 <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
-                                <form method="post" action="{{ url_for('main.vip') }}" class="info-form" style="display: inline;" title="View URL Scan Status">
+                                <form method="post" action="{{ url_for('main.vip') }}#row-{{ url.key }}" class="info-form" style="display: inline;" title="View URL Scan Status">
                                     <!-- Information Button -->
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
@@ -73,7 +73,7 @@
                                         <i class="info circle icon"></i>
                                     </button>
                                 </form>
-                                <form method="post" action="{{ url_for('main.user') }}" class="delete-form" style="display: inline;" title="Delete this URL">
+                                <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
                                     <button type="submit" name="delete_submit" class="ui icon button delete-button">
@@ -186,6 +186,21 @@
                 }
             });
         });
+    });
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.location.hash) {
+            setTimeout(function() {
+                const element = document.querySelector(window.location.hash);
+                if (element) {
+                    // Calculate the position with an offset
+                    const yOffset = -50; // Adjust this value to your needs
+                    const yPosition = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+
+                    window.scrollTo({ top: yPosition, behavior: 'smooth' });
+                }
+            }, 0); // You can adjust this delay if needed
+        }
     });
 </script>
 {% endblock %}
