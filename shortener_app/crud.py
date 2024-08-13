@@ -148,3 +148,20 @@ def is_url_owner(db: Session, secret_key: str, api_key: str) -> bool:
         return False  # URL not found
     else:
         return True
+    
+def verify_secret_and_api_key(db: Session, secret_key: str, api_key: str, api_db: Session) -> bool:
+    # First, verify the api_key exists in the APIKey table using api_db session
+    api_key_record = api_db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
+    
+    if not api_key_record:
+        return False
+
+    # Then, verify the secret_key exists in the URL table using db session
+    db_url = db.query(models.URL).filter(
+        models.URL.secret_key == secret_key,
+        models.URL.api_key == api_key,
+        models.URL.is_active
+    ).first()
+
+    # Return True if a matching record is found in both databases, otherwise False
+    return bool(db_url)

@@ -136,3 +136,37 @@ def get_user_urls():
             return []
     except requests.exceptions.RequestException:
         return []
+    
+def get_url_scan_status(secret_key: str, api_key: str, target_url: str, scan_type: str = None):
+    """
+    เรียกใช้ API เพื่อรับสถานะการสแกน URL โดยไม่ใช้ JWT Authentication
+    """
+    url = current_app.config['SHORTENER_HOST'] + "/user/url/status"
+
+    params = {
+        "secret_key": secret_key,
+        "api_key": api_key,
+        "target_url": target_url,
+    }
+
+    if scan_type:
+        params["scan_type"] = scan_type
+
+    try:
+        response = requests.get(url, params=params)
+        
+        if response.status_code == 200:
+            # Return the JSON response and status code if status is 200 OK
+            return response.json(), response.status_code
+        
+        elif response.status_code == 404:
+            # Return error message and status code if scan records not found
+            return {"error": "Scan records not found."}, response.status_code
+        
+        else:
+            # Return error message and status code for other status codes
+            return {"error": f"Unexpected error: {response.status_code}"}, response.status_code
+    
+    except requests.exceptions.RequestException as e:
+        # Return error message and a status code indicating request failure
+        return {"error": "Request failed."}, 500

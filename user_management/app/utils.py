@@ -1,4 +1,4 @@
-from flask import url_for
+from flask import url_for, current_app
 from wtforms.fields import Field
 from wtforms.widgets import HiddenInput
 import sys
@@ -8,6 +8,9 @@ import base64
 from PIL import Image
 from qrcodegen import QrCode
 from io import BytesIO
+
+from datetime import datetime
+import pytz
 
 # from wtforms.compat import text_type
 if sys.version_info[0] >= 3:
@@ -75,3 +78,20 @@ def generate_qr_code(data):
     img.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
+
+def convert_to_localtime(utc_timestamp):
+    # Access the timezone from the current app's config
+    timezone_str = current_app.config.get('TIMEZONE', 'Asia/Bangkok')
+    
+    # Convert the UTC timestamp to a datetime object
+    utc_time = datetime.strptime(utc_timestamp, '%Y-%m-%dT%H:%M:%S')
+    
+    # Set the timezone to UTC
+    utc_time = utc_time.replace(tzinfo=pytz.utc)
+    
+    # Convert to the desired timezone
+    local_timezone = pytz.timezone(timezone_str)
+    local_time = utc_time.astimezone(local_timezone)
+    
+    # Format the datetime object as a string
+    return local_time.strftime('%Y-%m-%d %H:%M:%S')

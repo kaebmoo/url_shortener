@@ -63,6 +63,8 @@ class Config:
     NT_SMS_PASS = os.environ.get('NT_SMS_PASS')
     NT_SMS_SENDER = os.environ.get('NT_SMS_SENDER')
 
+    TIMEZONE = os.getenv('TIMEZONE', 'UTC')  # Default to UTC if not set
+
 
     REDIS_URL = os.getenv('REDISTOGO_URL', 'http://localhost:6379')
 

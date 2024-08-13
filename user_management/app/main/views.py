@@ -4,9 +4,9 @@ from flask_login import current_user, login_required
 import requests
 
 from app.models import EditableHTML, ShortenedURL
-from app.main.forms import DeleteURLForm
-from app.utils import generate_qr_code
-from app.apicall import get_user_urls
+from app.main.forms import URLActionForm
+from app.utils import generate_qr_code, convert_to_localtime
+from app.apicall import get_user_urls, get_url_scan_status
 
 main = Blueprint('main', __name__)
 
@@ -14,6 +14,24 @@ main = Blueprint('main', __name__)
 @main.errorhandler(CSRFError)
 def handle_csrf_error(e):
     return render_template('errors/400.html'), 400
+
+def convert_scan_results_to_localtime(scan_results):
+    if isinstance(scan_results, tuple):
+        # Assume the first element of the tuple is the list of scan results
+        scan_results_list = scan_results[0]
+    else:
+        scan_results_list = scan_results
+
+    for index, result in enumerate(scan_results_list):
+        print(f"Processing item {index}: {result} (type: {type(result)})")
+        if isinstance(result, dict) and 'timestamp' in result:
+            original_timestamp = result['timestamp']
+            result['timestamp'] = convert_to_localtime(result['timestamp'])
+            print(f"Converted {original_timestamp} to {result['timestamp']}")
+        else:
+            print(f"Item {index} does not have a timestamp or is not a dictionary.")
+
+
 
 @main.route('/generate_qr_code')
 @login_required
@@ -40,51 +58,73 @@ def index():
 @main.route('/user', methods=['GET', 'POST'])
 @login_required
 def user():
-    delete_form = DeleteURLForm()
-
-    print("Form data:", request.form)  # Debug print
-
-    if delete_form.validate_on_submit() and 'url_secret_key' in request.form:
-        shortener_host = current_app.config['SHORTENER_HOST']
-        headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-API-KEY': session.get('uid')
-        }
-        response = requests.delete(f'{shortener_host}/admin/{delete_form.url_secret_key.data}', headers=headers)
-        if response.status_code == 200:
-            flash('URL deleted successfully', 'success')
-        else:
-            flash('Failed to delete URL', 'danger')
-        return redirect(url_for('main.user'))
+    url_action_form = URLActionForm()
+    scan_results = None  # Initialize scan_results to None
+    # Initialize scan_results_list to a default value
+    scan_results_list = []
 
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
     sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
-    
+
+    print("Form data:", request.form)  # Debug print
     shortener_host = current_app.config['SHORTENER_HOST']
-    return render_template('main/user.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
+
+    if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
+        url_secret_key = request.form['url_secret_key']
+        api_key = session.get('uid')
+        target_url = request.form['target_url']
+
+        if 'submit_info' in request.form:
+            scan_results = get_url_scan_status(secret_key=url_secret_key, api_key=api_key, target_url=target_url, scan_type=None)
+            if scan_results is None:
+                flash('Failed to retrieve scan status', 'danger')
+            else:
+                # Convert timestamps to local time
+                # Ensure scan_results is not None and is a tuple
+                if scan_results is not None and isinstance(scan_results, tuple):
+                    # Convert timestamps to local time
+                    convert_scan_results_to_localtime(scan_results)
+
+                    # Access the first element of scan_results
+                    scan_results_list = scan_results[0]
+                else:
+                    # Handle the case where scan_results is None or not a tuple
+                    scan_results_list = []
+
+                # Added: Attach the scan results to the URL
+                # Optimize attaching scan results to the URL
+                matching_url = next((url for url in user_urls if url['secret_key'] == url_secret_key), None)
+                if matching_url:
+                    matching_url['scan_results'] = scan_results
+        
+        elif 'submit_delete' in request.form:
+            headers = {
+                'accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-API-KEY': session.get('uid')
+            }
+            response = requests.delete(f'{shortener_host}/admin/{url_action_form.url_secret_key.data}', headers=headers)
+            if response.status_code == 200:
+                flash('URL deleted successfully', 'success')
+            else:
+                flash('Failed to delete URL', 'danger')
+            
+            return redirect(url_for('main.user'))
+    
+    return render_template('main/user.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/vip', methods=['GET', 'POST'])
 @login_required
 def vip():
-    delete_form = DeleteURLForm()
-
-    if delete_form.validate_on_submit() and 'url_secret_key' in request.form:
-        shortener_host = current_app.config['SHORTENER_HOST']
-        headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-API-KEY': session.get('uid')
-        }
-        response = requests.delete(f'{shortener_host}/admin/{delete_form.url_secret_key.data}', headers=headers)
-        if response.status_code == 200:
-            flash('URL deleted successfully', 'success')
-        else:
-            flash('Failed to delete URL', 'danger')
-        return redirect(url_for('main.vip'))
+    url_action_form = URLActionForm()
+    scan_results = None  # Initialize scan_results to None
+    # Initialize scan_results_list to a default value
+    scan_results_list = []
+    
+    shortener_host = current_app.config['SHORTENER_HOST']
 
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
@@ -92,8 +132,49 @@ def vip():
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
     sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
 
-    shortener_host = current_app.config['SHORTENER_HOST']
-    return render_template('main/vip.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, delete_form=delete_form)
+    if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
+        url_secret_key = request.form['url_secret_key']
+        api_key = session.get('uid')
+        target_url = request.form['target_url']
+
+        if 'submit_info' in request.form:
+            scan_results = get_url_scan_status(secret_key=url_secret_key, api_key=api_key, target_url=target_url, scan_type=None)
+            if scan_results is None:
+                flash('Failed to retrieve scan status', 'danger')
+            else:
+                # Convert timestamps to local time
+                 # Ensure scan_results is not None and is a tuple
+                if scan_results is not None and isinstance(scan_results, tuple):
+                    # Convert timestamps to local time
+                    convert_scan_results_to_localtime(scan_results)
+
+                    # Access the first element of scan_results
+                    scan_results_list = scan_results[0]
+                else:
+                    # Handle the case where scan_results is None or not a tuple
+                    scan_results_list = []
+
+
+                # Added: Attach the scan results to the URL
+                # Optimize attaching scan results to the URL
+                matching_url = next((url for url in user_urls if url['secret_key'] == url_secret_key), None)
+                if matching_url:
+                    matching_url['scan_results'] = scan_results
+
+        elif 'submit_delete' in request.form:            
+            headers = {
+                'accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-API-KEY': session.get('uid')
+            }
+            response = requests.delete(f'{shortener_host}/admin/{url_action_form.url_secret_key.data}', headers=headers)
+            if response.status_code == 200:
+                flash('URL deleted successfully', 'success')
+            else:
+                flash('Failed to delete URL', 'danger')
+            return redirect(url_for('main.vip'))
+
+    return render_template('main/vip.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/about')
 def about():

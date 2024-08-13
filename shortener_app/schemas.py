@@ -1,6 +1,8 @@
 # shortener_app/schemas.py
 
 from pydantic import ConfigDict, BaseModel, Field
+from datetime import datetime
+from typing import Optional
 
 class URLBase(BaseModel):
     target_url: str
@@ -30,3 +32,13 @@ class APIKeyCreate(BaseModel):
 class APIKeyDelete(BaseModel):
     api_key: str
     
+
+class ScanStatus(BaseModel):
+    url: str
+    status: Optional[str] = None  # Allow status to be None
+    result: str
+    scan_type: str
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True

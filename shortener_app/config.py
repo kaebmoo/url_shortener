@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     base_url: str = os.getenv('BASE_URL', 'http://localhost:8000')
     db_url: str = os.getenv('DB_URL', 'sqlite:///./shortener.db')
     secret_key: str = os.getenv('SECRET_KEY', 'default_secret_key')  # เพิ่ม SECRET_KEY
-    db_api: str = os.getenv('DB_API', 'sqlite:///./user_management/data-dev.sqlite')
+    db_api: str = os.getenv('DB_API', 'sqlite:///./url_shortener/apikey.db')
     db_blacklist: str = os.getenv('DB_BLACKLIST', 'sqlite:///blacklist.db')
     model_config = SettingsConfigDict(env_file=".env")
     host: str = os.getenv('HOST', '127.0.0.1')

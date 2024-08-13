@@ -29,6 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import time 
 import json
+from typing import List
 
 from .config import get_settings
 from .database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
@@ -448,6 +449,44 @@ async def get_user_url(
     user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).all()
     user_urls_json = jsonable_encoder(user_urls)
     return JSONResponse(content=user_urls_json, status_code=200)
+
+@app.get("/user/url/status", response_model=List[schemas.ScanStatus], tags=["info"])
+def get_url_scan_status(
+    secret_key: str,
+    api_key: str,
+    target_url: str,
+    scan_type: str = None,  # Optional filter for scan_type
+    db: Session = Depends(get_db),
+    api_db: Session = Depends(get_api_db),
+):
+    is_valid = crud.verify_secret_and_api_key(db, secret_key=secret_key, api_key=api_key, api_db=api_db)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Secret key or API key not found or invalid."
+        )
+
+    query = db.query(models.scan_records).filter(models.scan_records.url == target_url)
+    
+    if scan_type:
+        query = query.filter(models.scan_records.scan_type == scan_type)
+
+    scan_records = query.order_by(models.scan_records.timestamp.desc()).all()
+
+    if not scan_records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scan records not found."
+        )
+
+    return [
+        schemas.ScanStatus(
+            url=record.url,
+            status=record.status if record.status is not None else "None",
+            result=record.result,
+            scan_type=record.scan_type,
+            timestamp=record.timestamp
+        )
+        for record in scan_records
+    ]
 
 @app.get(
     "/admin/{secret_key}",

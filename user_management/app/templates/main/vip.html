@@ -20,7 +20,7 @@
                         <th style="width: 10%;">Created At</th>
                         <th style="width: 10%;">Updated At</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th style="width: 10%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,7 +56,7 @@
                                 {{ status.upper() }}
                             {% endif %}
                         </td>
-                        <td style="width: 15%;">
+                        <td style="width: 10%;">
                             <div class="ui buttons" style="margin-bottom: 10px;">
                                 <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Copy URL to clipboard">
                                     <i class="copy icon"></i>
@@ -64,8 +64,17 @@
                                 <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
-                                <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
-                                    {{ delete_form.csrf_token }}
+                                <form method="post" action="{{ url_for('main.vip') }}" class="info-form" style="display: inline;" title="View URL Scan Status">
+                                    <!-- Information Button -->
+                                    {{ url_action_form.csrf_token }}
+                                    <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
+                                    <input type="hidden" name="target_url" value="{{ url.target_url }}">
+                                    <button type="submit" name="submit_info" class="ui icon button" style="margin-right: 3px;" title="View URL Scan Status">
+                                        <i class="info circle icon"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ url_for('main.user') }}" class="delete-form" style="display: inline;" title="Delete this URL">
+                                    {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
                                     <button type="submit" name="delete_submit" class="ui icon button delete-button">
                                         <i class="trash icon"></i>
@@ -73,11 +82,39 @@
                                 </form>
                             </div>
                             <div class="qr-code-display" style="display:none; margin-top:10px;">
-                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 70px; max-height: 70px;"><br>
+                                <img src="" alt="QR Code" class="qr-code-img" style="max-width: 70px; max-height: 70px;">
+                                <br>
                                 <a href="" download="qrcode.png" class="download-qr-code">Download QR</a>
                             </div>
                         </td>
                     </tr>
+                    {% if url.scan_results %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="ui segment">
+                                <h4>Scan Results</h4>
+                                <table class="ui celled table">
+                                    <thead>
+                                        <tr>
+                                            <th>Result</th>
+                                            <th>Scan Type</th>
+                                            <th>Last Scanned</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result in url.scan_results[0] %}
+                                        <tr>
+                                            <td>{{ result.result }}</td>
+                                            <td>{{ result.scan_type }}</td>
+                                            <td>{{ result.timestamp }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -115,7 +152,11 @@
 </style>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
         function convertUTCToLocalTime(utcTime, timeZone) {
+                if (!utcTime) { 
+                    return ''; // หรือค่าเริ่มต้นอื่น ๆ ที่เหมาะสม 
+                }
                 // แปลงเวลาจากรูปแบบ 'YYYY-MM-DDTHH:MM:SS' เป็น Date object
                 const [datePart, timePart] = utcTime.split('T');
                 const [year, month, day] = datePart.split('-');
@@ -152,6 +193,7 @@
                     element.textContent = convertUTCToLocalTime(utcTime, timeZone);  // แปลงเวลาและแสดงใน element
                 });
             };
+        });
 
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.copy-button').forEach(button => {
