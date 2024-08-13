@@ -11,6 +11,7 @@ from rq import Queue
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.assets import app_css, app_js, vendor_css, vendor_js
 from config import config as Config
@@ -32,6 +33,9 @@ socketio = SocketIO()  # Initialize SocketIO
 
 def create_app(config):
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app)
+    app.config['APPLICATION_ROOT'] = '/'
+
     config_name = config
 
     if not isinstance(config, str):

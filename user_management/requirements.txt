@@ -13,3 +13,8 @@ email-validator
 redis-py-cluster
 Flask-SQLAlchemy==3.0.5 
 pytz
+gunicorn
+gevent
+flask_rq2
+flask_socketio
+phonenumbers

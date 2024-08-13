@@ -124,7 +124,7 @@ class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL',
-        'sqlite:///' + os.path.join(basedir, 'data.sqlite'))
+        'sqlite:///' + os.path.join(basedir, 'user_management.sqlite'))
     SQLALCHEMY_BINDS = { 
         'shortener_db': os.environ.get('SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener.db')),
         'blacklist_db': os.environ.get('BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
