@@ -37,6 +37,11 @@ def validate_and_format_phone_number(form, field):
     except NumberParseException:
         raise ValidationError('Invalid phone number format.')
 
+def validate_domain(form, field):
+    allowed_domain = 'ntplc.co.th'
+    if not field.data.endswith(f"@{allowed_domain}"):
+        raise ValidationError(f"Email domain must be {allowed_domain}")
+    
 class LoginForm(FlaskForm):
     login_method = RadioField('Login with:', choices=[('email', 'Email'), ('phone', 'Phone Number')], default='email')
     email = EmailField(
@@ -59,7 +64,7 @@ class LoginForm(FlaskForm):
 
 class RegistrationFormSelect(FlaskForm):
     registration_type = RadioField('Register with:', 
-                                   choices=[('email', 'Email'), ('phone', 'Phone Number')], 
+                                   choices=[('email', 'Email')], # , ('phone', 'Phone Number')
                                    default='email',  # กำหนดค่าเริ่มต้น
                                    validators=[InputRequired()])
     submit = SubmitField('Continue')
@@ -100,7 +105,8 @@ class RegistrationForm(FlaskForm):
     email = EmailField(
         'Email', validators=[InputRequired(),
                              Length(1, 64),
-                             Email()])
+                             Email(),
+                             validate_domain])
     # phone_number = TelField('Phone')
     password = PasswordField(
         'Password',
