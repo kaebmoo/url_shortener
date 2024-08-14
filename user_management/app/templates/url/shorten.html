@@ -30,7 +30,7 @@
                 {% if url_data.target_url %}
                     <img id="pageFavicon" src="https://www.google.com/s2/favicons?sz=32&domain={{ url_data.target_url }}" alt="Favicon" style="margin-right: 8px; width: 32px; height: 32px;">
                 {% else %}
-                    <img id="pageFavicon" src="">
+                    <img id="pageFavicon" src="" alt="Favicon" style="display: none;">
                 {% endif %}
                 <div id="pageTitle">
                     {{ url_data.title }}
