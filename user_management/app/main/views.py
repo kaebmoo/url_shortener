@@ -158,6 +158,8 @@ def vip():
         api_key = session.get('uid')
         target_url = request.form['target_url']
 
+        # print("Request form data:", request.form)
+
         if 'submit_info' in request.form:
             scan_results = get_url_scan_status(secret_key=url_secret_key, api_key=api_key, target_url=target_url, scan_type=None)
             if scan_results is None:

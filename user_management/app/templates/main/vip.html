@@ -76,7 +76,9 @@
                                 <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
-                                    <button type="submit" name="delete_submit" class="ui icon button delete-button" host-url="{{ app_host_name }}{{ app_path }}">
+                                    <input type="hidden" name="target_url" value="{{ url.target_url }}">
+                                    <input type="hidden" name="submit_delete" value="1"> 
+                                    <button type="submit" name="submit_delete" class="ui icon button delete-button" host-url="{{ app_host_name }}{{ app_path }}">
                                         <i class="trash icon"></i>
                                     </button>
                                 </form>
