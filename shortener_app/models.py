@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy import event
 from sqlalchemy.orm import mapper
 
-from .database import Base, BaseAPI, BaseBlacklist
+from database import Base, BaseAPI, BaseBlacklist
 
 class URL(Base):
     __tablename__ = "urls"  # ชื่อ table ใน sqlite
