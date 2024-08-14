@@ -44,6 +44,10 @@ def generate_qr_code_endpoint():
 
 @main.route('/')
 def index():
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
+    shortener_host = current_app.config['SHORTENER_HOST']
+
     if current_user.is_authenticated:
         # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
         user_urls = get_user_urls()
@@ -51,13 +55,17 @@ def index():
         # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
         sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
         
-        shortener_host = current_app.config['SHORTENER_HOST']
-        return render_template('main/index.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count)
-    return render_template('main/index.html', shortener_host=current_app.config['SHORTENER_HOST'])
+        
+        return render_template('main/index.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count)
+    return render_template('main/index.html', app_path=app_path, shortener_host=current_app.config['SHORTENER_HOST'], app_host_name=app_host_name)
 
 @main.route('/user', methods=['GET', 'POST'])
 @login_required
 def user():
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
+    shortener_host = current_app.config['SHORTENER_HOST']
+
     url_action_form = URLActionForm()
     scan_results = None  # Initialize scan_results to None
     # Initialize scan_results_list to a default value
@@ -74,7 +82,6 @@ def user():
         url['updated_at'] = convert_to_localtime(url['updated_at'])
 
     print("Form data:", request.form)  # Debug print
-    shortener_host = current_app.config['SHORTENER_HOST']
 
     if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
         url_secret_key = request.form['url_secret_key']
@@ -118,7 +125,7 @@ def user():
             
             return redirect(url_for('main.user'))
     
-    return render_template('main/user.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/user.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/vip', methods=['GET', 'POST'])
 @login_required
@@ -128,12 +135,14 @@ def vip():
     # Initialize scan_results_list to a default value
     scan_results_list = []
     
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
 
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
-    
+
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
     sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
     # Convert 'created_at' and 'updated_at' to local time
@@ -183,7 +192,7 @@ def vip():
                 flash('Failed to delete URL', 'danger')
             return redirect(url_for('main.vip'))
 
-    return render_template('main/vip.html', user_urls=sorted_user_urls, shortener_host=shortener_host, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/vip.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/about')
 def about():

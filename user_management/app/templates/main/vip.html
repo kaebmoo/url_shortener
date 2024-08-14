@@ -61,7 +61,7 @@
                                 <button class="ui icon button copy-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Copy URL to clipboard">
                                     <i class="copy icon"></i>
                                 </button>
-                                <button class="ui icon button qr-button" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
+                                <button class="ui icon button qr-button" host-url="{{ app_host_name }}{{ app_path }}" data-url="{{ shortener_host }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
                                 <form method="post" action="{{ url_for('main.vip') }}#row-{{ url.key }}" class="info-form" style="display: inline;" title="View URL Scan Status">
@@ -76,7 +76,7 @@
                                 <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
-                                    <button type="submit" name="delete_submit" class="ui icon button delete-button">
+                                    <button type="submit" name="delete_submit" class="ui icon button delete-button" host-url="{{ app_host_name }}{{ app_path }}">
                                         <i class="trash icon"></i>
                                     </button>
                                 </form>
@@ -167,8 +167,10 @@
                 const qrDisplay = this.parentElement.nextElementSibling;
                 const qrImage = qrDisplay.querySelector('.qr-code-img');
                 const downloadLink = qrDisplay.querySelector('.download-qr-code');
+                const hostUrl = this.getAttribute('host-url')
+                console.log(hostUrl)
 
-                fetch(`/generate_qr_code?data=${encodeURIComponent(url)}`)
+                fetch(`${hostUrl}generate_qr_code?data=${encodeURIComponent(url)}`)
                     .then(response => response.json())
                     .then(data => {
                         qrImage.src = 'data:image/png;base64,' + data.qr_code;

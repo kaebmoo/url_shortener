@@ -18,3 +18,4 @@ gevent
 flask_rq2
 flask_socketio
 phonenumbers
+PyJWT

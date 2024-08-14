@@ -8,8 +8,8 @@ from PIL import Image
 import io
 import base64
 
-
 from app.models import EditableHTML
+
 
 shorten = Blueprint('shorten', __name__)
 
@@ -39,6 +39,10 @@ def generate_qr_code(data):
     return img_str
 
 def get_user_url_count():
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
+    shortener_host = current_app.config['SHORTENER_HOST']
+
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
@@ -46,7 +50,7 @@ def get_user_url_count():
     }
 
     try:
-        shortener_host = current_app.config['SHORTENER_HOST']
+        
         response = requests.get(shortener_host + '/user/info', headers=headers)
         data = response.json()
         if response.status_code == 200:
@@ -70,7 +74,10 @@ def generate_qr_code_endpoint():
 @shorten.route('/admin/<secret_key>', methods=['DELETE'])
 @login_required
 def delete_url(secret_key):
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
+    
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
@@ -91,7 +98,10 @@ def delete_url(secret_key):
 @shorten.route('/admin/<secret_key>', methods=['GET'])
 @login_required
 def get_url_info(secret_key):
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
+    
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
@@ -113,6 +123,10 @@ def get_url_info(secret_key):
 @shorten.route('/shorten', methods=['GET', 'POST'])
 @login_required
 def shorten_url():
+    app_path = current_app.config['APP_PATH']
+    app_host_name = current_app.config['APP_HOST']
+    shortener_host = current_app.config['SHORTENER_HOST']
+
     url_data = None
     message = None  # กำหนดค่าเริ่มต้น
     short_url = None  # กำหนดค่าเริ่มต้น
@@ -121,7 +135,7 @@ def shorten_url():
     # สร้างข้อความแจ้งจำนวน URL ที่สร้างแล้ว ทั้งภาษาไทยและภาษาอังกฤษ
     url_count_message_th = f"คุณได้สร้าง URL แล้วทั้งหมด {url_count} รายการ"
     url_count_message_en = f"You have created a total of {url_count} URLs"
-    shortener_host = current_app.config['SHORTENER_HOST']
+    
     api_key = session.get('uid')
 
     form = URLShortenForm()

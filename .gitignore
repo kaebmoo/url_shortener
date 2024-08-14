@@ -19,3 +19,5 @@ user_management/SBG_20230811.pdf
 user_management/app/nt_sms.py
 apikey.db
 user_management/app/static/favicon.ico
+/user_management/app/public/webassets-external
+/user_management/app/public/.webassets-cache
