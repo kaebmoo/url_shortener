@@ -21,4 +21,3 @@ apikey.db
 user_management/app/static/favicon.ico
 /user_management/app/public/webassets-external
 /user_management/app/public/.webassets-cache
-user_management/app/templates/partials/_head.html

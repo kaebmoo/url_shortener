@@ -204,7 +204,7 @@ async def websocket_endpoint(
         return
 
     is_updated = False
-    timeout = 20  # กำหนด timeout เป็น 10 วินาที (หรือค่าที่เหมาะสม)
+    timeout = 10  # กำหนด timeout เป็น 10 วินาที (หรือค่าที่เหมาะสม)
     start_time = time.time()
 
     while not is_updated and time.time() - start_time < timeout:

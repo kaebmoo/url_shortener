@@ -26,6 +26,9 @@ app = create_app(os.getenv('FLASK_CONFIG') or 'default')
 # manager = Manager(app)
 migrate = Migrate(app, db)
 
+@app.context_processor
+def inject_asset_path():
+    return dict(asset_path=app.config['ASSET_PATH'])
 
 @app.shell_context_processor
 def make_shell_context():
