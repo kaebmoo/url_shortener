@@ -66,6 +66,7 @@ class Config:
     TIMEZONE = os.getenv('TIMEZONE', 'UTC')  # Default to UTC if not set
     APP_PATH = os.getenv('APP_PATH', '/')   # กรณีกำหนด path อื่น เช่น /apps การทำ reverse proxy
     APP_HOST = os.getenv('APP_HOST', 'http://localhost') # กำหนดเป็นชื่อ domain
+    SHORTENER_HOST_NAME = os.getenv('SHORTENER_HOST_NAME', 'http://localhost')
 
 
     REDIS_URL = os.getenv('REDISTOGO_URL', 'http://localhost:6379')

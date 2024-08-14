@@ -47,6 +47,7 @@ def index():
     app_path = current_app.config['APP_PATH']
     app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
+    shortener_host_name = current_app.config['SHORTENER_HOST_NAME']
 
     if current_user.is_authenticated:
         # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
@@ -56,8 +57,8 @@ def index():
         sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
         
         
-        return render_template('main/index.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count)
-    return render_template('main/index.html', app_path=app_path, shortener_host=current_app.config['SHORTENER_HOST'], app_host_name=app_host_name)
+        return render_template('main/index.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count)
+    return render_template('main/index.html', app_path=app_path, shortener_host=current_app.config['SHORTENER_HOST'], app_host_name=app_host_name, shortener_host_name=shortener_host_name)
 
 @main.route('/user', methods=['GET', 'POST'])
 @login_required
@@ -65,6 +66,7 @@ def user():
     app_path = current_app.config['APP_PATH']
     app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
+    shortener_host_name = current_app.config['SHORTENER_HOST_NAME']
 
     url_action_form = URLActionForm()
     scan_results = None  # Initialize scan_results to None
@@ -125,7 +127,7 @@ def user():
             
             return redirect(url_for('main.user'))
     
-    return render_template('main/user.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/user.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/vip', methods=['GET', 'POST'])
 @login_required
@@ -138,6 +140,7 @@ def vip():
     app_path = current_app.config['APP_PATH']
     app_host_name = current_app.config['APP_HOST']
     shortener_host = current_app.config['SHORTENER_HOST']
+    shortener_host_name = current_app.config['SHORTENER_HOST_NAME']
 
     # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
@@ -192,7 +195,7 @@ def vip():
                 flash('Failed to delete URL', 'danger')
             return redirect(url_for('main.vip'))
 
-    return render_template('main/vip.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/vip.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/about')
 def about():
