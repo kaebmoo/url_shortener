@@ -386,7 +386,7 @@ def forward_to_target_url(
 
 
 @app.post("/url", response_model=schemas.URLInfo, tags=["url"]) # , dependencies=[Security(verify_api_key)]
-def create_url(
+async def create_url(
     url: schemas.URLBase,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -404,8 +404,8 @@ def create_url(
         raise_forbidden(message="The provided URL is blacklisted and cannot be shortened.")
 
     # ตรวจสอบว่า URL เป็น phishing หรือไม่โดยใช้ check_phishing
-    phishing_check_response = check_phishing(url.target_url, background_tasks)
-    if phishing_check_response.status_code == 400:
+    phishing_check_response = await check_phishing(url.target_url, background_tasks)
+    if phishing_check_response.status_code == 403:
         raise_forbidden(message=phishing_check_response.content["message"])
     
     # ดึง role_id จาก database ถ้ามีการกำหนดให้ใช้งาน
