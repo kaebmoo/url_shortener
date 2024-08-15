@@ -11,6 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from contextlib import asynccontextmanager
 
 from sqlalchemy.orm import Session
 from starlette.datastructures import URL
@@ -37,9 +38,17 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from config import get_settings
 from database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
 from . import crud, models, schemas, keygen
+from phishing import phishing_data
 
 
-app = FastAPI(root_path="")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Fetch phishing URLs
+    phishing_data.fetch_phishing_urls()  # เรียกใช้งาน fetch_phishing_urls จากอินสแตนซ์ของ PhishingData
+    yield
+    # Shutdown: Any cleanup code would go here (ถ้ามี)
+
+app = FastAPI(root_path="", lifespan=lifespan)
 templates = Jinja2Templates(directory="shortener_app/templates")
 
 SECRET_KEY = get_settings().secret_key
@@ -50,6 +59,23 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
+
+@app.get("/check-phishing/", tags=["url"])
+async def check_phishing(url: str, background_tasks: BackgroundTasks):
+    # Schedule the feed to be updated if necessary
+    if datetime.now() - phishing_data.last_update_time > timedelta(hours=12):
+        background_tasks.add_task(phishing_data.update_phishing_urls)
+    
+    if url in phishing_data.phishing_urls:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"message": "The URL is flagged as a phishing site based on OpenPhish and Phishing Army data", "status_code": 403}
+        )
+    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "The URL is not flagged as a phishing site based on OpenPhish and Phishing Army data", "status_code": 200}
+    )
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
     base_url = URL(get_settings().base_url)
@@ -376,6 +402,11 @@ def create_url(
     # ตรวจสอบว่า URL อยู่ใน blacklist หรือไม่
     if crud.is_url_in_blacklist(blacklist_db, url.target_url):
         raise_forbidden(message="The provided URL is blacklisted and cannot be shortened.")
+
+    # ตรวจสอบว่า URL เป็น phishing หรือไม่โดยใช้ check_phishing
+    phishing_check_response = check_phishing(url.target_url, background_tasks)
+    if phishing_check_response.status_code == 400:
+        raise_forbidden(message=phishing_check_response.content["message"])
     
     # ดึง role_id จาก database ถ้ามีการกำหนดให้ใช้งาน
     role_id = None
