@@ -40,5 +40,4 @@ class ScanStatus(BaseModel):
     scan_type: str
     timestamp: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
