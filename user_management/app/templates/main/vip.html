@@ -64,15 +64,18 @@
                                 <button class="ui icon button qr-button" host-url="{{ app_host_name }}{{ app_path }}" data-url="{{ shortener_host_name }}/{{ url.key }}" style="margin-right: 3px;" title="Generate and download QR code">
                                     <i class="qrcode icon"></i>
                                 </button>
-                                <form method="post" action="{{ url_for('main.vip') }}#row-{{ url.key }}" class="info-form" style="display: inline;" title="View URL Scan Status">
+
+                                <button class="ui icon button toggle-scan-button" style="margin-right: 3px;" title="Scan Results">
+                                    <i class="eye icon"></i>
+                                </button>
+                                <form method="post" action="{{ url_for('main.vip') }}#row-{{ url.key }}" class="info-form" style="display: none;">
                                     <!-- Information Button -->
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
                                     <input type="hidden" name="target_url" value="{{ url.target_url }}">
-                                    <button type="submit" name="submit_info" class="ui icon button" style="margin-right: 3px;" title="View URL Scan Status">
-                                        <i class="info circle icon"></i>
-                                    </button>
+                                    <button type="submit" name="submit_info" class="ui icon button"></button>
                                 </form>
+                                
                                 <form method="post" action="{{ url_for('main.vip') }}" class="delete-form" style="display: inline;" title="Delete this URL">
                                     {{ url_action_form.csrf_token }}
                                     <input type="hidden" name="url_secret_key" value="{{ url.secret_key }}">
@@ -154,6 +157,25 @@
 </style>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+
+        // Toggle Scan Results
+        document.querySelectorAll('.toggle-scan-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const row = this.closest('tr');
+                const scanResultsRow = row.nextElementSibling;
+                const infoForm = this.closest('td').querySelector('.info-form');
+
+                if (scanResultsRow && scanResultsRow.querySelector('.ui.segment')) {
+                    const isVisible = scanResultsRow.style.display !== 'none';
+                    scanResultsRow.style.display = isVisible ? 'none' : '';
+                } else {
+                    // If no scan results, trigger the info form to fetch results
+                    infoForm.querySelector('button[type="submit"]').click();
+                }
+            });
+        });
+
+        // Copy URL to clipboard
         document.querySelectorAll('.copy-button').forEach(button => {
             button.addEventListener('click', function () {
                 const url = this.getAttribute('data-url');
@@ -163,14 +185,14 @@
             });
         });
 
+        // Generate and display QR code
         document.querySelectorAll('.qr-button').forEach(button => {
             button.addEventListener('click', function () {
                 const url = this.getAttribute('data-url');
                 const qrDisplay = this.parentElement.nextElementSibling;
                 const qrImage = qrDisplay.querySelector('.qr-code-img');
                 const downloadLink = qrDisplay.querySelector('.download-qr-code');
-                const hostUrl = this.getAttribute('host-url')
-                console.log(hostUrl)
+                const hostUrl = this.getAttribute('host-url');
 
                 fetch(`${hostUrl}generate_qr_code?data=${encodeURIComponent(url)}`)
                     .then(response => response.json())
@@ -182,6 +204,7 @@
             });
         });
 
+        // Confirm delete URL
         document.querySelectorAll('.delete-button').forEach(button => {
             button.addEventListener('click', function (event) {
                 event.preventDefault();
@@ -190,14 +213,12 @@
                 }
             });
         });
-    });
 
-    document.addEventListener('DOMContentLoaded', function() {
+        // Scroll to hash on page load
         if (window.location.hash) {
             setTimeout(function() {
                 const element = document.querySelector(window.location.hash);
                 if (element) {
-                    // Calculate the position with an offset
                     const yOffset = -50; // Adjust this value to your needs
                     const yPosition = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
 
