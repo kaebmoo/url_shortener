@@ -33,6 +33,9 @@ import json
 from typing import List
 import sys
 import os
+import socket
+from ipaddress import ip_network, ip_address, IPv6Address, IPv4Address
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import get_settings
@@ -51,6 +54,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(root_path="", lifespan=lifespan)
 templates = Jinja2Templates(directory="shortener_app/templates")
 
+INTERNAL_IP_RANGES = [
+    # IPv4 private address ranges
+    ip_network("10.0.0.0/8"),
+    ip_network("172.16.0.0/12"),
+    ip_network("192.168.0.0/16"),
+    
+    # IPv6 private address ranges
+    ip_network("fc00::/7"),  # Unique Local Addresses (ULA)
+    ip_network("fe80::/10"), # Link-Local Addresses
+]
+
 SECRET_KEY = get_settings().secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -60,6 +74,14 @@ models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
 
+def is_internal_url(url):
+    hostname = urlparse(url).hostname
+    try:
+        ip = ip_address(socket.gethostbyname(hostname))
+        return any(ip in network for network in INTERNAL_IP_RANGES)
+    except socket.error:
+        return False
+    
 @app.get("/check-phishing/", tags=["url"])
 async def check_phishing(url: str, background_tasks: BackgroundTasks):
     # Schedule the feed to be updated if necessary
@@ -365,18 +387,24 @@ def forward_to_target_url(
     
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
         # Check if target URL exists
-        try:
-            # https://www.tutorialspoint.com/how-to-check-whether-user-s-internet-is-on-or-off-using-python
-            response = requests.head(db_url.target_url, timeout=10)
-            # เพิ่มการ click +1
+        # Check if target URL exists or is in the internal network
+        if is_internal_url(db_url.target_url):
+            # Skip the reachability check for internal URLs
             crud.update_db_clicks(db=db, db_url=db_url)
-            return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
-            #if response.status_code >= 400:  # Check for client or server errors
-            #    raise_not_reachable(message=f"The target URL '{db_url.target_url}' is not reachable.")
-        except requests.ConnectionError:
-            raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
-        except requests.RequestException: # Catch all request exceptions
-            raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
+            return RedirectResponse(db_url.target_url)
+        else:
+            try:
+                # https://www.tutorialspoint.com/how-to-check-whether-user-s-internet-is-on-or-off-using-python
+                response = requests.head(db_url.target_url, timeout=10)
+                # เพิ่มการ click +1
+                crud.update_db_clicks(db=db, db_url=db_url)
+                return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
+                #if response.status_code >= 400:  # Check for client or server errors
+                #    raise_not_reachable(message=f"The target URL '{db_url.target_url}' is not reachable.")
+            except requests.ConnectionError:
+                raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
+            except requests.RequestException: # Catch all request exceptions
+                raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
 
     else:
         raise_not_found(request)
