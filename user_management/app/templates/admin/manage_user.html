@@ -6,9 +6,19 @@
 {% set endpoints = [
     ('admin.user_info', 'User information'),
     ('admin.change_user_email', 'Change email address'),
+    ('admin.change_user_phone', 'Change phone number'),
     ('admin.change_account_type', 'Change account type'),
     (deletion_endpoint, 'Delete user')
 ] %}
+
+{% set filtered_endpoints = [] %}
+{% for route, name in endpoints %}
+    {% if not is_email and route != 'admin.change_user_email' %}
+        {% set _ = filtered_endpoints.append((route, name)) %}
+    {% elif is_email and route != 'admin.change_user_phone' %}
+        {% set _ = filtered_endpoints.append((route, name)) %}
+    {% endif %}
+{% endfor %}
 
 {% macro navigation(items) %}
     <div class="ui vertical fluid secondary menu">
@@ -24,7 +34,7 @@
 {% macro user_info(user) %}
     <table class="ui compact definition table">
         <tr><td>Full name</td><td>{{ '%s %s' % (user.first_name, user.last_name) }}</td></tr>
-        <tr><td>Email address</td><td>{{ user.email }}</td></tr>
+        <tr><td>Email or Phone / <br>API Key</td><td>{{ email_or_phone }} / <br>{{ user.uid }}</td></tr>
         <tr><td>Account type</td><td>{{ user.role.name }}</td></tr>
     </table>
 {% endmacro %}
@@ -43,7 +53,7 @@
         </div>
         <div class="stretched divided very relaxed row">
             <div class="four wide column">
-                {{ navigation(endpoints) }}
+                {{ navigation(filtered_endpoints) }} <!-- {{ navigation(endpoints) }} -->
             </div>
             <div class="eight wide column">
                 {% if request.endpoint == deletion_endpoint %}

@@ -30,6 +30,7 @@ from app import db
 from app.admin.forms import (
     ChangeAccountTypeForm,
     ChangeUserEmailForm,
+    ChangeUserPhoneForm,
     InviteUserForm,
     NewUserForm,
     AddURLForm,
@@ -39,6 +40,9 @@ from app.decorators import admin_required
 from app.email import send_email
 from app.models import EditableHTML, Role, User, URL
 from app.apicall import deactivate_api_key, register_api_key
+
+from email_validator import validate_email, EmailNotValidError
+import phonenumbers
 
 admin = Blueprint('admin', __name__)
 
@@ -293,9 +297,21 @@ def registered_users():
 def user_info(user_id):
     """View a user's profile."""
     user = User.query.filter_by(id=user_id).first()
+    try:
+        validate_email(user.email, check_deliverability=False)
+        email_or_phone = user.email
+        is_email = True
+    except EmailNotValidError:
+        # Handle invalid email
+        # It is the UID in the email, it is the user who registered with the phone number. 
+        # bring phone number information to display instead.
+        phone_number = phonenumbers.parse(user.phone_number, "TH")
+        phone_number = phonenumbers.format_number(phone_number, phonenumbers.PhoneNumberFormat.NATIONAL)
+        email_or_phone = phone_number
+        is_email = False
     if user is None:
         abort(404)
-    return render_template('admin/manage_user.html', user=user)
+    return render_template('admin/manage_user.html', user=user, email_or_phone=email_or_phone, is_email=is_email, form=None)
 
 
 @admin.route('/user/<int:user_id>/change-email', methods=['GET', 'POST'])
@@ -313,8 +329,24 @@ def change_user_email(user_id):
         db.session.commit()
         flash('Email for user {} successfully changed to {}.'.format(
             user.full_name(), user.email), 'form-success')
-    return render_template('admin/manage_user.html', user=user, form=form)
+    return render_template('admin/manage_user.html', user=user, form=form, is_email=True)
 
+@admin.route('/user/<int:user_id>/change-phone', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def change_user_phone(user_id):
+    """Change a user's email."""
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        abort(404)
+    form = ChangeUserPhoneForm()
+    if form.validate_on_submit():
+        user.phone_number = form.phone_number.data
+        db.session.add(user)
+        db.session.commit()
+        flash('Phone for user {} successfully changed to {}.'.format(
+            user.full_name(), user.email), 'form-success')
+    return render_template('admin/manage_user.html', user=user, form=form, is_email=False)
 
 @admin.route(
     '/user/<int:user_id>/change-account-type', methods=['GET', 'POST'])

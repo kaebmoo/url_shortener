@@ -26,7 +26,24 @@ from flask_wtf.file import FileAllowed, FileRequired
 from app import db
 from app.models import Role, User
 
+import phonenumbers
+from phonenumbers import NumberParseException, PhoneNumberFormat
 
+def validate_and_format_phone_number(form, field):
+    try:
+        # Parse the phone number with TH (Thailand) as the default region
+        parsed_number = phonenumbers.parse(field.data, "TH")
+        
+        # Validate the parsed number
+        if phonenumbers.is_valid_number(parsed_number):
+            # Format the number in E164 format (e.g., +66813520625)
+            formatted_number = phonenumbers.format_number(parsed_number, PhoneNumberFormat.E164)
+            field.data = formatted_number.replace('+', '')  # Update field data with the formatted number without '+'
+        else:
+            raise ValidationError('Invalid phone number.')
+    except NumberParseException:
+        raise ValidationError('Invalid phone number format.')
+    
 class ChangeUserEmailForm(FlaskForm):
     email = EmailField(
         'New email', validators=[InputRequired(),
@@ -38,6 +55,16 @@ class ChangeUserEmailForm(FlaskForm):
         if User.query.filter_by(email=field.data).first():
             raise ValidationError('Email already registered.')
 
+class ChangeUserPhoneForm(FlaskForm):
+    phone_number = StringField('New phone number', validators=[InputRequired(), 
+                                                           Length(min=10, max=15), 
+                                                           validate_and_format_phone_number])
+    # password = PasswordField('Password', validators=[InputRequired()])
+    submit = SubmitField('Update phone number')
+
+    def validate_phone_number(self, field):
+        if User.query.filter_by(phone_number=field.data).first():
+            raise ValidationError('Phone number already registered.')
 
 class ChangeAccountTypeForm(FlaskForm):
     role = QuerySelectField(
