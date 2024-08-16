@@ -143,9 +143,14 @@ def get_url_scan_status(secret_key: str, api_key: str, target_url: str, scan_typ
     """
     url = current_app.config['SHORTENER_HOST'] + "/user/url/status"
 
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-API-KEY': api_key
+    }
+
     params = {
         "secret_key": secret_key,
-        "api_key": api_key,
         "target_url": target_url,
     }
 
@@ -153,7 +158,7 @@ def get_url_scan_status(secret_key: str, api_key: str, target_url: str, scan_typ
         params["scan_type"] = scan_type
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, headers=headers, params=params)
         
         if response.status_code == 200:
             # Return the JSON response and status code if status is 200 OK

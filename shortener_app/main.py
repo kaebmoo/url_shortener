@@ -520,9 +520,9 @@ async def get_user_url(
 @app.get("/user/url/status", response_model=List[schemas.ScanStatus], tags=["info"])
 def get_url_scan_status(
     secret_key: str,
-    api_key: str,
     target_url: str,
     scan_type: str = None,  # Optional filter for scan_type
+    api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db),
     api_db: Session = Depends(get_api_db),
 ):
