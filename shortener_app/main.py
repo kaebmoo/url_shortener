@@ -77,10 +77,15 @@ models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
 def is_internal_url(url):
     hostname = urlparse(url).hostname
     try:
-        ip = ip_address(socket.gethostbyname(hostname))
-        return any(ip in network for network in INTERNAL_IP_RANGES)
-    except socket.error:
-        return False
+        addr_info = socket.getaddrinfo(hostname, None)  # Resolves both IPv4 and IPv6
+        for addr in addr_info:
+            ip = ip_address(addr[4][0])
+            if any(ip in network for network in INTERNAL_IP_RANGES):
+                return True
+        return False  # If none of the IPs are in the internal ranges
+    except socket.gaierror:
+        # Handle case where the hostname cannot be resolved by treating it as internal
+        return True
     
 @app.get("/check-phishing/", tags=["url"])
 async def check_phishing(url: str, background_tasks: BackgroundTasks):
