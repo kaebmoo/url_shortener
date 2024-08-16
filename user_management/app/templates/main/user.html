@@ -193,13 +193,20 @@
                 const downloadLink = qrDisplay.querySelector('.download-qr-code');
                 const hostUrl = this.getAttribute('host-url');
 
-                fetch(`${hostUrl}generate_qr_code?data=${encodeURIComponent(url)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        qrImage.src = 'data:image/png;base64,' + data.qr_code;
-                        downloadLink.href = qrImage.src;
-                        qrDisplay.style.display = 'block';
-                    });
+                if (qrImage.src && qrImage.src.includes('base64,')) {
+                    // Toggle visibility if QR code is already generated
+                    const isVisible = qrDisplay.style.display !== 'none';
+                    qrDisplay.style.display = isVisible ? 'none' : 'block';
+                }
+                else {
+                    fetch(`${hostUrl}generate_qr_code?data=${encodeURIComponent(url)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            qrImage.src = 'data:image/png;base64,' + data.qr_code;
+                            downloadLink.href = qrImage.src;
+                            qrDisplay.style.display = 'block';
+                        });
+                }
             });
         });
 
