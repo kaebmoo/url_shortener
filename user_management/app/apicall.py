@@ -146,19 +146,17 @@ def get_url_scan_status(secret_key: str, api_key: str, target_url: str, scan_typ
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': api_key
+        'X-API-KEY': api_key,
     }
 
-    params = {
+    data = {
         "secret_key": secret_key,
         "target_url": target_url,
+        "scan_type": scan_type  # รวม scan_type ใน body ถ้ามี
     }
 
-    if scan_type:
-        params["scan_type"] = scan_type
-
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.post(url, headers=headers, json=data)
         
         if response.status_code == 200:
             # Return the JSON response and status code if status is 200 OK

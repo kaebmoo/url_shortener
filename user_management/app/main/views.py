@@ -23,7 +23,7 @@ def convert_scan_results_to_localtime(scan_results):
         scan_results_list = scan_results
 
     for index, result in enumerate(scan_results_list):
-        print(f"Processing item {index}: {result} (type: {type(result)})")
+        # print(f"Processing item {index}: {result} (type: {type(result)})")
         if isinstance(result, dict) and 'timestamp' in result:
             # original_timestamp = result['timestamp']
             result['timestamp'] = convert_to_localtime(result['timestamp'])
@@ -83,7 +83,7 @@ def user():
         url['created_at'] = convert_to_localtime(url['created_at'])
         url['updated_at'] = convert_to_localtime(url['updated_at'])
 
-    print("Form data:", request.form)  # Debug print
+    # print("Form data:", request.form)  # Debug print
 
     if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
         url_secret_key = request.form['url_secret_key']

@@ -3,8 +3,8 @@ from typing import Optional
 import requests  # Import for checking website existence
 import secrets
 import validators
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket
-from fastapi.security import APIKeyHeader
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
 from fastapi.encoders import jsonable_encoder
@@ -54,6 +54,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(root_path="", lifespan=lifespan)
 templates = Jinja2Templates(directory="shortener_app/templates")
 
+# กำหนด Security scheme สำหรับ X-API-KEY Header    
+api_key_header = APIKeyHeader(name="X-API-KEY")
+
+# Security scheme สำหรับ BearerAuth
+http_bearer = HTTPBearer()
+
 INTERNAL_IP_RANGES = [
     # IPv4 private address ranges
     ip_network("10.0.0.0/8"),
@@ -73,6 +79,15 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
+
+def get_secret_key(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing Authorization header",
+        )
+    return authorization[len("Bearer "):]
+
 
 def is_internal_url(url):
     hostname = urlparse(url).hostname
@@ -222,7 +237,6 @@ def create_access_token():
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     
-api_key_header = APIKeyHeader(name="X-API-KEY")
 
 # Updated API key verification function
 async def verify_api_key(
@@ -517,11 +531,11 @@ async def get_user_url(
     user_urls_json = jsonable_encoder(user_urls)
     return JSONResponse(content=user_urls_json, status_code=200)
 
-@app.get("/user/url/status", response_model=List[schemas.ScanStatus], tags=["info"])
+@app.post("/user/url/status", response_model=List[schemas.ScanStatus], tags=["info"])
 def get_url_scan_status(
-    secret_key: str,
-    target_url: str,
-    scan_type: str = None,  # Optional filter for scan_type
+    secret_key: str = Body(...),  # รับค่า secret_key จาก body
+    target_url: str = Body(...),  # รับค่า target_url จาก body
+    scan_type: str = Body(None),  # รับค่า scan_type จาก body ถ้ามี
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db),
     api_db: Session = Depends(get_api_db),
@@ -601,9 +615,13 @@ def custom_openapi():
             "type": "apiKey",
             "in": "header",
             "name": "X-API-KEY",
-        }
+        },
+
     }
-    openapi_schema["security"] = [{"ApiKeyAuth": []}]
+    # ให้ทุก endpoint ใช้ ApiKeyAuth เป็นค่าเริ่มต้น
+    openapi_schema["security"] = [
+        {"ApiKeyAuth": []},
+    ]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
