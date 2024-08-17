@@ -36,14 +36,14 @@
                             {% if status and status.upper() != 'DANGER' %}
                                 <a href="{{ url.target_url }}" target="_blank" title="{{ url.target_url }}">{{ url.target_url }}</a>
                             {% else %}
-                                <a href="/preview_url?url={{ url.target_url }}" target="_blank">{{ url.target_url }}</a>
+                                <a href="{{ asset_path }}/preview_url?url={{ url.target_url }}" target="_blank">{{ url.target_url }}</a>
                             {% endif %}
                         </td>
                         <td style="width: 20%;">
                             {% if status and status.upper() != 'DANGER' %}
                                 <a href="{{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
                             {% else %}
-                                <a href="/preview_url?url={{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
+                                <a href="{{ asset_path }}/preview_url?url={{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
                             {% endif %}
                         </td>
                         <td style="width: 5%;">{{ url.clicks }}</td>
