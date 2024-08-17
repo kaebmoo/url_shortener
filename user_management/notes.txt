@@ -3,3 +3,5 @@ redis-server
 rq worker --with-scheduler
 
 https://stackoverflow.com/questions/54106071/how-can-i-set-up-a-virtual-environment-for-python-in-visual-studio-code
+
+ใช้ชื่อโดเมนภายในแทน localhost เพื่อให้ Nginx จัดการ routing อย่างถูกต้อง เช่น ตั้งค่า 127.0.0.1 myinternaldomain.com ในไฟล์ /etc/hosts แล้วใช้ myinternaldomain.com เพื่อให้การเรียกไปที่บริการ FastAPI สามารถทำงานได้โดยไม่มีปัญหา loopback
