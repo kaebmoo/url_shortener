@@ -81,6 +81,8 @@ def capture_screenshot_route():
 
 @main.route("/preview_url", methods=["GET"])
 def preview_url():
+    app_path = current_app.config['APP_PATH']
+
     url = request.args.get("url")
     if not url:
         return jsonify({"error": "No URL provided"}), 400
@@ -89,7 +91,7 @@ def preview_url():
     if not validate_url(url):
         return jsonify({"error": "Invalid URL provided"}), 400
     
-    return render_template("main/preview.html", url=url)
+    return render_template("main/preview.html", url=url, app_path=app_path)
 
 '''@main.route("/preview_url_", methods=["GET"])
 def preview_url_():

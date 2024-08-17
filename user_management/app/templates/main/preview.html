@@ -58,7 +58,7 @@
             setTimeout(function() {
                 var url = "{{ url }}"; // URL ที่คุณต้องการตรวจสอบ
                 var csrfToken = "{{ csrf_token() }}"; // เพิ่ม CSRF token
-        
+                
                 $.ajax({
                     url: "{{ url_for('main.capture_screenshot_route') }}",
                     method: "POST",
@@ -79,7 +79,7 @@
                             '<div class="screenshot-details"><p>URL: ' + response.url + '</p></div>' +
                             '<div class="ui two buttons" style="margin-top: 20px;">' +
                             '<a href="' + response.url + '" class="ui red button" target="_blank">Proceed with caution: Only visit this site if you\'re sure you understand the risks.</a>' +
-                            '<a href="/" class="ui green button">Back to safety</a>' +
+                            '<a href="{{ app_path }}" class="ui green button">Back to safety</a>' +
                             '</div>' +
                             '</div>'
                         );
