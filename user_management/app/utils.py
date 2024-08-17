@@ -152,7 +152,7 @@ async def capture_screenshot(url: str):
         page = await context.new_page()
 
         try:
-            response = await page.goto(url, timeout=30000, wait_until="load") # , wait_until="domcontentloaded"
+            response = await page.goto(url, timeout=30000, wait_until="networkidle") # , wait_until="domcontentloaded" "networkidle"
             status = response.status
             destination_url = response.url
         except Exception as e:
