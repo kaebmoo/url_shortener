@@ -2,10 +2,12 @@ from flask import Blueprint, render_template, redirect, session, url_for, flash,
 from flask_wtf.csrf import CSRFError
 from flask_login import current_user, login_required
 import requests
+from urllib.parse import urlparse
+import asyncio
 
 from app.models import EditableHTML, ShortenedURL
 from app.main.forms import URLActionForm
-from app.utils import generate_qr_code, convert_to_localtime
+from app.utils import generate_qr_code, convert_to_localtime, capture_screenshot, validate_and_correct_url, validate_url
 from app.apicall import get_user_urls, get_url_scan_status
 
 main = Blueprint('main', __name__)
@@ -30,7 +32,6 @@ def convert_scan_results_to_localtime(scan_results):
             # print(f"Converted {original_timestamp} to {result['timestamp']}")
         else:
             print(f"Item {index} does not have a timestamp or is not a dictionary.")
-
 
 
 @main.route('/generate_qr_code')
@@ -59,6 +60,58 @@ def index():
         
         return render_template('main/index.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count)
     return render_template('main/index.html', app_path=app_path, shortener_host=current_app.config['SHORTENER_HOST'], app_host_name=app_host_name, shortener_host_name=shortener_host_name)
+
+@main.route("/capture_screenshot", methods=["POST"])
+def capture_screenshot_route():
+    url = request.json.get("url")
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+    
+    url = validate_and_correct_url(url)
+    if validate_url(url):
+        try:
+            screenshot_path, destination_url, status = asyncio.run(capture_screenshot(url))
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return jsonify({"error": "Unable to capture screenshot."}), 500
+    else:
+        return jsonify({"error": "Invalid URL provided"}), 400
+    
+    return jsonify({"screenshot_path": screenshot_path, "url": destination_url})
+
+@main.route("/preview_url", methods=["GET"])
+def preview_url():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+    
+    url = validate_and_correct_url(url)
+    if not validate_url(url):
+        return jsonify({"error": "Invalid URL provided"}), 400
+    
+    return render_template("main/preview.html", url=url)
+
+'''@main.route("/preview_url_", methods=["GET"])
+def preview_url_():
+    url = request.args.get("url")  # รับ URL ผ่าน query parameter
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+    
+    url = validate_and_correct_url(url)  # ตรวจสอบและแก้ไข URL
+    if validate_url(url):
+        try:
+            screenshot_path, destination_url, status = asyncio.run(capture_screenshot(url))
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            screenshot_path = None
+    else:
+        return jsonify({"error": "Invalid URL provided"}), 400
+    
+    if not screenshot_path:
+        return jsonify({"error": "Unable to capture screenshot. The page took too long to load."}), 500
+    
+    # Render HTML template and pass the screenshot path and URL to it
+    return render_template("main/preview.html", screenshot=screenshot_path, url=destination_url)'''
 
 @main.route('/user', methods=['GET', 'POST'])
 @login_required

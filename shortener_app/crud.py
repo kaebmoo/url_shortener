@@ -33,9 +33,10 @@ def create_db_url(db: Session, url: schemas.URLBase, api_key: str) -> models.URL
     db.refresh(db_url)'''
 
 def get_db_url_by_key(db: Session, url_key: str) -> models.URL:
+    # , func.lower(models.URL.status) != 'danger' # เงื่อนไขว่าไม่เอา 'danger'
     return (
         db.query(models.URL)
-        .filter(models.URL.key == url_key, models.URL.is_active, func.lower(models.URL.status) != 'danger' )
+        .filter(models.URL.key == url_key, models.URL.is_active)
         .first()
     )
 

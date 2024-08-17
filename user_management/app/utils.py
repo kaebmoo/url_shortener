@@ -92,3 +92,76 @@ def convert_to_localtime(utc_timestamp):
     except Exception as e:
         print(f"Error converting time: {e}")
         return utc_timestamp  # return the original timestamp if there's an error
+    
+from urllib.parse import urlparse
+from playwright.async_api import async_playwright
+import logging 
+import asyncio
+import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
+import os
+
+def validate_and_correct_url(url: str) -> str:
+    if not urlparse(url).scheme:
+        # ถ้าไม่มี schema เพิ่ม "http://"
+        url = f"http://{url}"
+    return url
+
+def validate_url(url):
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme or not parsed_url.netloc:
+        return False
+    return True
+
+
+async def fetch_content_type(url):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.head(url) as response:
+                return response.headers.get('Content-Type')
+    except ClientConnectorError as e:
+        print(f"Connection error: {e}")
+        return None
+        
+async def capture_screenshot(url: str):
+    '''content_type = await fetch_content_type(url)
+    if 'text/html' not in content_type:
+        print(f"URL is not an HTML page, content type: {content_type}")
+        return None
+    '''    
+    async with async_playwright() as playwright:
+        parsed_url = urlparse(url)
+        # Replace '/' with '_' to create a valid file name
+        file_name = f"{parsed_url.netloc}{parsed_url.path.replace('/', '_')}.png"
+        # Save the screenshot in the 'static' folder
+        # output_path = f"user_management/app/static/screenshots/{file_name}"
+        output_path = os.path.join(current_app.root_path, "static", "screenshots", file_name)
+
+        # chromium = playwright.chromium
+        # browser = await chromium.launch(headless=True)
+        firefox = playwright.firefox
+        browser = await firefox.launch(headless=True)
+
+        # page = await browser.new_page(viewport={'width': 1280, 'height': 720})
+
+        # สร้าง context ใหม่พร้อมกำหนด User-Agent
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.4472.124 Safari/537.36",
+            viewport={'width': 1280, 'height': 720}
+        )
+        page = await context.new_page()
+
+        try:
+            response = await page.goto(url, timeout=30000, wait_until="load") # , wait_until="domcontentloaded"
+            status = response.status
+            destination_url = response.url
+        except Exception as e:
+            print("The page took too long to load or cannot be accessed.")
+            logging.error(f"Error: {e}")
+            return None
+
+        
+        await page.screenshot(path=output_path, full_page=False)
+        await browser.close()
+
+        return file_name, destination_url, status  # Return just the file name, not the full path
