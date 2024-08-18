@@ -183,6 +183,13 @@ def shorten_url():
                 flash(f'{message}: {short_url}', 'success')
                 qr_code_base64 = generate_qr_code(short_url)
 
+                if isinstance(url_count, (int, float)):
+                    url_count += 1
+                else:
+                    url_count = int(url_count) + 1
+
+                url_count_message_en = f"You have created a total of {url_count} URLs"
+
                 # if 'persistent_messages' not in session:
                 #     session['persistent_messages'] = []
                 # session['persistent_messages'] = message

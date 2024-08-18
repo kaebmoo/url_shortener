@@ -414,7 +414,8 @@ def forward_to_target_url(
         else:
             try:
                 # https://www.tutorialspoint.com/how-to-check-whether-user-s-internet-is-on-or-off-using-python
-                response = requests.head(db_url.target_url, timeout=10)
+                # response = requests.head(db_url.target_url, timeout=10)
+                response = requests.get(db_url.target_url, timeout=10, allow_redirects=True)
                 # เพิ่มการ click +1
                 crud.update_db_clicks(db=db, db_url=db_url)
                 return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
