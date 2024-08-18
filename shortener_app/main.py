@@ -415,11 +415,12 @@ def forward_to_target_url(
             try:
                 # https://www.tutorialspoint.com/how-to-check-whether-user-s-internet-is-on-or-off-using-python
                 # response = requests.head(db_url.target_url, timeout=10)
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.96 Safari/537.36'
-                }
+                # headers = {
+                #    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.96 Safari/537.36'
+                #}
 
-                response = requests.get(db_url.target_url, headers=headers, timeout=10) # allow_redirects=True
+                # response = requests.get(db_url.target_url, headers=headers, timeout=10) # allow_redirects=True
+                
                 # เพิ่มการ click +1
                 crud.update_db_clicks(db=db, db_url=db_url)
                 return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
