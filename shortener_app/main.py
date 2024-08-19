@@ -360,6 +360,29 @@ def generate_qr_code(data):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
+def is_host_active(target_url):
+    try:
+        # แยก hostname และ port จาก URL
+        parsed_url = urlparse(target_url)
+        hostname = parsed_url.hostname
+        port = parsed_url.port
+
+        # ถ้าไม่มี port ใน URL ให้กำหนดค่า default ตาม scheme
+        if port is None:
+            if parsed_url.scheme == "https":
+                port = 443
+            else:
+                port = 80
+
+        # สร้าง socket และเชื่อมต่อ
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)  # กำหนด timeout
+        sock.connect((hostname, port))
+        sock.close()  # ปิด socket หลังจากเชื่อมต่อสำเร็จ
+        return True
+    except (socket.timeout, socket.error):
+        return False
+
 @app.get("/")
 def read_root():
     return "Welcome to the URL shortener API :)"
@@ -412,25 +435,17 @@ def forward_to_target_url(
             crud.update_db_clicks(db=db, db_url=db_url)
             return RedirectResponse(db_url.target_url)
         else:
-            try:
-                # https://www.tutorialspoint.com/how-to-check-whether-user-s-internet-is-on-or-off-using-python
-                # response = requests.head(db_url.target_url, timeout=10)
-                # headers = {
-                #    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.96 Safari/537.36'
-                #}
-
-                # response = requests.get(db_url.target_url, headers=headers, timeout=10) # allow_redirects=True
-                
-                # เพิ่มการ click +1
+            '''            
+            # the reachability check
+            if is_host_active(db_url.target_url):
                 crud.update_db_clicks(db=db, db_url=db_url)
                 return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
-                #if response.status_code >= 400:  # Check for client or server errors
-                #    raise_not_reachable(message=f"The target URL '{db_url.target_url}' is not reachable.")
-            except requests.ConnectionError:
+            else:
                 raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
-            except requests.RequestException: # Catch all request exceptions
-                raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
-
+            '''
+            crud.update_db_clicks(db=db, db_url=db_url)
+            return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
+            
     else:
         raise_not_found(request)
 
