@@ -530,7 +530,7 @@ async def forward_to_target_url(
     ):
     
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
-        if db_url.status.lower() == "danger":
+        if db_url is not None and db_url.status.lower() == "danger":
             # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
             html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
             return HTMLResponse(content=html_content)
