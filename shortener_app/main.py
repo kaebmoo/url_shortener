@@ -1,9 +1,11 @@
 # shortener_app/main.py
+import logging
 from typing import Optional
+from fastapi.staticfiles import StaticFiles
 import requests  # Import for checking website existence
 import secrets
 import validators
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body, WebSocketDisconnect
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
@@ -42,6 +44,7 @@ from config import get_settings
 from database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
 from . import crud, models, schemas, keygen
 from phishing import phishing_data
+from utils import validate_and_correct_url, validate_url, capture_screenshot
 
 
 @asynccontextmanager
@@ -53,6 +56,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(root_path="", lifespan=lifespan)
 templates = Jinja2Templates(directory="shortener_app/templates")
+
+# Mount the static files directory
+app.mount("/static", StaticFiles(directory="shortener_app/static"), name="static")
+
 
 # กำหนด Security scheme สำหรับ X-API-KEY Header    
 api_key_header = APIKeyHeader(name="X-API-KEY")
@@ -79,6 +86,8 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
 models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
+
+logging.basicConfig(level=logging.INFO)
 
 def get_secret_key(authorization: str = Header(...)):
     if not authorization.startswith("Bearer "):
@@ -261,35 +270,41 @@ async def websocket_endpoint(
     
     await websocket.accept()
 
-    # รับข้อความแรกที่มี api_key
-    auth_data = await websocket.receive_json()
-    api_key = auth_data.get("api_key")
+    try:
+        # รับข้อความแรกที่มี api_key
+        auth_data = await websocket.receive_json()
+        api_key = auth_data.get("api_key")
 
-    # ตรวจสอบว่าผู้ใช้มีสิทธิ์เข้าถึง URL นี้หรือไม่
-    if not crud.is_url_owner(db, secret_key, api_key): 
-        await websocket.close(code=1008, reason="Unauthorized")  # ปิดการเชื่อมต่อหากไม่ได้รับอนุญาต
-        return
+        # ตรวจสอบว่าผู้ใช้มีสิทธิ์เข้าถึง URL นี้หรือไม่
+        if not crud.is_url_owner(db, secret_key, api_key): 
+            await websocket.close(code=1008, reason="Unauthorized")  # ปิดการเชื่อมต่อหากไม่ได้รับอนุญาต
+            return
 
-    is_updated = False
-    timeout = 10  # กำหนด timeout เป็น 10 วินาที (หรือค่าที่เหมาะสม)
-    start_time = time.time()
+        is_updated = False
+        timeout = 10  # กำหนด timeout เป็น 10 วินาที (หรือค่าที่เหมาะสม)
+        start_time = time.time()
 
-    while not is_updated and time.time() - start_time < timeout:
-        is_updated = crud.is_url_info_updated(db, secret_key, api_key)
+        while not is_updated and time.time() - start_time < timeout:
+            is_updated = crud.is_url_info_updated(db, secret_key, api_key)
 
-        if is_updated:
-            db_url = crud.get_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key)
-            url_info = get_admin_info(db_url)
+            if is_updated:
+                db_url = crud.get_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key)
+                url_info = get_admin_info(db_url)
 
-            # Decode the JSONResponse body before accessing elements
-            url_info_dict = json.loads(url_info.body.decode("utf-8"))
+                # Decode the JSONResponse body before accessing elements
+                url_info_dict = json.loads(url_info.body.decode("utf-8"))
 
-            await websocket.send_json(url_info_dict)  # Send the content of the JSONResponse 
+                await websocket.send_json(url_info_dict)  # Send the content of the JSONResponse 
 
-        await asyncio.sleep(5)
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        logging.warning("WebSocket disconnected")
+    except Exception as e:
+        logging.error(f"Unexpected error in WebSocket connection: {e}")
+    finally:
+        # ถ้าออกจาก loop แสดงว่าไม่มีการอัพเดต หรือมีการอัพเดตแล้ว ให้ปิดการเชื่อมต่อ
+        await websocket.close()
 
-    # ถ้าออกจาก loop แสดงว่าไม่มีการอัพเดต หรือมีการอัพเดตแล้ว ให้ปิดการเชื่อมต่อ
-    await websocket.close()
     
 async def fetch_page_info(url: str):
     """Fetch title and favicon from the given URL asynchronously."""
@@ -315,7 +330,11 @@ async def fetch_page_info(url: str):
 
         return title, favicon_url
 
-    except aiohttp.ClientError:  # จัดการ exception จาก aiohttp
+    except aiohttp.ClientError as e:
+        logging.error(f"HTTP request error: {e}")
+        return None, None
+    except Exception as e:
+        logging.error(f"Unexpected error occurred while fetching page info: {e}")
         return None, None
     
 # Create a thread pool executor (you can adjust the max_workers if needed)
@@ -420,6 +439,67 @@ def refresh_token(refresh_token: str):
             detail="Invalid or expired refresh token",
         )
 
+@app.post("/capture_screenshot")
+async def capture_screenshot_route(
+    url_key: str, 
+    api_key: str = Depends(verify_api_key), 
+    db: Session = Depends(get_db)):
+
+    # ค้นหา URL จากฐานข้อมูลโดยใช้ url_key
+    db_url = crud.get_db_url_by_key(db=db, url_key=url_key)
+    
+    if not db_url:
+        raise HTTPException(status_code=404, detail="URL not found")
+    
+    # ตรวจสอบสถานะของ URL
+    # if db_url.status.lower() != "danger":
+    #     raise HTTPException(status_code=400, detail="URL is not marked as dangerous or does not exist")
+    
+    try:
+        # ส่ง target_url ไป capture_screenshot
+        screenshot_file_name = await capture_screenshot(db_url.target_url)
+        screenshot_path = f"/static/screenshots/{screenshot_file_name}"
+        
+        # Optionally update the database (commented out)
+        # db_url.screenshot_path = screenshot_path
+        # db_url.updated_at = func.now()
+        # db.commit()
+        
+    except aiohttp.ClientError as e:
+        logging.error(f"Network error occurred: {e}")
+        raise HTTPException(status_code=502, detail="Failed to fetch the webpage for screenshot.")
+    except OSError as e:
+        logging.error(f"File system error occurred: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save the screenshot.")
+    except Exception as e:
+        logging.error(f"Unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail="Unable to capture screenshot.")
+    
+    return {"screenshot_path": screenshot_path, "url": db_url.target_url}
+
+
+
+
+@app.get("/preview_url")
+async def preview_url(request: Request, url: str, api_key: str = Depends(verify_api_key),):
+    url = validate_and_correct_url(url)
+    
+    # Capture the screenshot and get only the file name
+    screenshot_file_name = await capture_screenshot(url)
+    
+    # Construct the screenshot path relative to the static directory
+    screenshot_path = f"/static/screenshots/{screenshot_file_name}"
+
+    # Render the preview template with the screenshot and other details
+    return templates.TemplateResponse("preview.html", {
+        "request": request, 
+        "url": url, 
+        "screenshot_path": screenshot_path, 
+        "app_path": "/"
+    })
+
+
+
 @app.get("/{url_key}")
 def forward_to_target_url(
         url_key: str,
@@ -428,6 +508,10 @@ def forward_to_target_url(
     ):
     
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
+        if db_url.status.lower() == "danger":
+            # Redirect to the preview URL if the URL is marked as dangerous
+            return RedirectResponse(url=f"/preview_url?url={db_url.target_url}")
+        
         # Check if target URL exists
         # Check if target URL exists or is in the internal network
         if is_internal_url(db_url.target_url):
