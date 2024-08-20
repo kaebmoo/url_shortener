@@ -43,7 +43,7 @@
                             {% if status and status.upper() != 'DANGER' %}
                                 <a href="{{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
                             {% else %}
-                                <a href="{{ asset_path }}/preview_url?url={{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
+                                <a href="{{ shortener_host_name }}/{{ url.key }}" target="_blank">{{ shortener_host_name }}/{{ url.key }}</a>
                             {% endif %}
                         </td>
                         <td style="width: 5%;">{{ url.clicks }}</td>

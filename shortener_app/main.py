@@ -82,6 +82,7 @@ SECRET_KEY = get_settings().secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 30
+SECRET_TOKEN = SECRET_KEY
 
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
@@ -231,7 +232,12 @@ def verify_jwt_token(authorization: str = Header(None)):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid token subject",
             )
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token has expired",
+        )
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid token",
@@ -477,31 +483,47 @@ async def capture_screenshot_route(
     
     return {"screenshot_path": screenshot_path, "url": db_url.target_url}
 
-
-
-
 @app.get("/preview_url")
-async def preview_url(request: Request, url: str):
+async def preview_url(request: Request, url: str, token: str = Header(...)):
+    if token != SECRET_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
     url = validate_and_correct_url(url)
-    
-    # Capture the screenshot and get only the file name
     screenshot_file_name = await capture_screenshot(url)
-    
-    # Construct the screenshot path relative to the static directory
     screenshot_path = f"/static/screenshots/{screenshot_file_name}"
-
-    # Render the preview template with the screenshot and other details
     return templates.TemplateResponse("preview.html", {
         "request": request, 
         "url": url, 
         "screenshot_path": screenshot_path, 
-        "app_path": "/"
+        "app_path": get_settings().safe_host
     })
+
+import httpx
+
+async def call_preview_url_async(url: str, token: str):
+    base_url = get_settings().base_url
+    preview_url = base_url + "/preview_url"
+    retries = 3
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        for _ in range(retries):
+            try:
+                response = await client.get(
+                    preview_url,
+                    params={"url": url},
+                    headers={"token": token}
+                )
+                if response.status_code == 200:
+                    return response.text
+                else:
+                    raise Exception(f"Failed to call preview_url: {response.status_code}")
+            except httpx.ReadTimeout:
+                if _ == retries - 1:
+                    raise Exception("Max retries exceeded with url")  
 
 
 
 @app.get("/{url_key}")
-def forward_to_target_url(
+async def forward_to_target_url(
         url_key: str,
         request: Request,
         db: Session = Depends(get_db)
@@ -509,8 +531,9 @@ def forward_to_target_url(
     
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
         if db_url.status.lower() == "danger":
-            # Redirect to the preview URL if the URL is marked as dangerous
-            return RedirectResponse(url=f"/preview_url?url={db_url.target_url}")
+            # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
+            html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
+            return HTMLResponse(content=html_content)
         
         # Check if target URL exists
         # Check if target URL exists or is in the internal network

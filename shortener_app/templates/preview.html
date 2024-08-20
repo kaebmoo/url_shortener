@@ -67,7 +67,7 @@
                     <div class="screenshot-details">
                         <h3 class="ui red header">Warning: This URL may be dangerous!</h3>
                     </div>
-                    <img id="screenshot" src="{{ screenshot_path }}" alt="Screenshot of the URL" onload="hideLoadingMessage()">
+                    <img id="screenshot" src="{{ screenshot_path }}" alt="Screenshot of the URL" onload="hideLoadingMessage()" onerror="handleImageError()">
                     <div class="screenshot-details">
                         <p>URL: {{ url }}</p>
                     </div>
@@ -75,6 +75,7 @@
                         <a href="{{ url }}" class="ui red button" target="_blank">
                             Proceed with caution: Only visit this site if you're sure you understand the risks.
                         </a>
+                        <!-- <a href="{{ app_path }}" class="ui green button">Back to safety</a>> -->
                         <a href="{{ app_path }}" class="ui green button">Back to safety</a>
                     </div>
                 </div>
@@ -85,9 +86,23 @@
 
     <script>
         function hideLoadingMessage() {
+            
             document.getElementById('loading-message').style.display = 'none';
             document.getElementById('content').style.display = 'block';
         }
+
+        function handleImageError() {
+            
+            document.getElementById('loading-message').innerText = 'Failed to load image. Please try again later.';
+            console.error('Error loading image at: ' + document.getElementById('screenshot').src);
+        }
+        window.addEventListener('load', function() {
+            var imgElement = document.getElementById('screenshot');
+            
+            if (imgElement.complete && imgElement.naturalHeight !== 0) {
+                hideLoadingMessage();
+            }
+        });
     </script>
 </body>
 </html>
