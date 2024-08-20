@@ -481,7 +481,7 @@ async def capture_screenshot_route(
 
 
 @app.get("/preview_url")
-async def preview_url(request: Request, url: str, api_key: str = Depends(verify_api_key),):
+async def preview_url(request: Request, url: str):
     url = validate_and_correct_url(url)
     
     # Capture the screenshot and get only the file name
