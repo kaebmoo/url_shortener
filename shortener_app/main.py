@@ -445,8 +445,8 @@ def refresh_token(refresh_token: str):
             detail="Invalid or expired refresh token",
         )
 
-@app.post("/capture_screenshot")
-async def capture_screenshot_route(
+@app.post("/capture_screen")
+async def capture_screen(
     url_key: str, 
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db)):
