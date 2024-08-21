@@ -655,9 +655,20 @@ async def get_user_url(
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db)
 ):
+    # Query the database to get the URLs
     user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).all()
+    
+    # Convert the results to JSON serializable form
     user_urls_json = jsonable_encoder(user_urls)
-    return JSONResponse(content=user_urls_json, status_code=200)
+
+    # Use Pydantic models to filter and return the desired fields
+    filtered_urls = [schemas.URLUser(**url).model_dump() for url in user_urls_json]
+
+    # ใช้ jsonable_encoder เพื่อแปลง datetime ให้เป็น string
+    json_compatible_data = jsonable_encoder(filtered_urls)
+    
+    return JSONResponse(content=json_compatible_data, status_code=200)
+    # return JSONResponse(content=user_urls_json, status_code=200) # return all value
 
 @app.post("/user/url/status", response_model=List[schemas.ScanStatus], tags=["info"])
 def get_url_scan_status(

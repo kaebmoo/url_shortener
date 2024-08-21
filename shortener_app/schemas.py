@@ -1,6 +1,6 @@
 # shortener_app/schemas.py
 
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field, HttpUrl
 from datetime import datetime
 from typing import Optional
 
@@ -24,6 +24,23 @@ class URLInfo(URL):
     # You could also add the two strings url and admin_url to URL. 
     # But by adding url and admin_url to the URLInfo subclass, 
     # you can use the data in your API without storing it in your database.
+
+class URLUser(BaseModel):
+    key: str
+    secret_key: str
+    target_url: HttpUrl
+    is_active: bool
+    clicks: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    is_checked: bool
+    status: str
+    title: Optional[str] = None
+    favicon_url: Optional[HttpUrl] = None
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 class APIKeyCreate(BaseModel):
     api_key: str
