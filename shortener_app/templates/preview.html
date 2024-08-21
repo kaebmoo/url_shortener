@@ -75,7 +75,6 @@
                         <a href="{{ url }}" class="ui red button" target="_blank">
                             Proceed with caution: Only visit this site if you're sure you understand the risks.
                         </a>
-                        <!-- <a href="{{ app_path }}" class="ui green button">Back to safety</a>> -->
                         <a href="{{ app_path }}" class="ui green button">Back to safety</a>
                     </div>
                 </div>
@@ -86,19 +85,27 @@
 
     <script>
         function hideLoadingMessage() {
-            
             document.getElementById('loading-message').style.display = 'none';
             document.getElementById('content').style.display = 'block';
         }
 
         function handleImageError() {
+            // ซ่อน dimmer และแสดงข้อความข้อผิดพลาด
+            document.getElementById('loading-message').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
             
-            document.getElementById('loading-message').innerText = 'Failed to load image. Please try again later.';
+            // อัพเดทข้อความที่ต้องการแสดงเมื่อเกิดข้อผิดพลาด
+            document.getElementById('result').innerHTML = `
+                <div class="ui red message">
+                    <div class="header">Failed to load web page image.</div>
+                    <p>The destination host may not be reachable.</p>
+                </div>`;
+            
             console.error('Error loading image at: ' + document.getElementById('screenshot').src);
         }
+
         window.addEventListener('load', function() {
             var imgElement = document.getElementById('screenshot');
-            
             if (imgElement.complete && imgElement.naturalHeight !== 0) {
                 hideLoadingMessage();
             }
