@@ -20,3 +20,4 @@ flask_socketio
 phonenumbers
 PyJWT
 playwright
+cryptography

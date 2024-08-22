@@ -80,7 +80,7 @@ The application uses SQLAlchemy for database operations. Models include:
 
 - User
 - Role
-- ShortenedURL
+- ShortenedURL ***
 
 ## Running the Application
 

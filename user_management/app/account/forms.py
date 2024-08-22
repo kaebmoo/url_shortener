@@ -64,7 +64,7 @@ class LoginForm(FlaskForm):
 
 class RegistrationFormSelect(FlaskForm):
     registration_type = RadioField('Register with:', 
-                                   choices=[('email', 'Email')], # , ('phone', 'Phone Number')
+                                   choices=[('email', 'Email'), ('phone', 'Phone Number')], # , ('phone', 'Phone Number')
                                    default='email',  # กำหนดค่าเริ่มต้น
                                    validators=[InputRequired()])
     submit = SubmitField('Continue')

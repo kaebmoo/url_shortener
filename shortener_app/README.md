@@ -33,7 +33,7 @@ You have two options for launching the live server:
 
     ```bash
     python3 -m uvicorn shortener_app.main:app --reload
-
+    ```
 
 ### Key Functions and Endpoints in `main.py`
 
@@ -47,29 +47,32 @@ The `main.py` file serves as the core of your URL shortening API, housing essent
 *   **`verify_jwt_token`, `create_access_token`, `refresh_token`:** Implement JWT-based authentication and token management for secure user access control.
 *   **`verify_api_key`:** Validates API keys against the database, ensuring only authorized requests are processed.
 *   **`fetch_page_info`, `fetch_page_info_and_update_sync`, `fetch_page_info_and_update`:** Asynchronously retrieve title and favicon information from target URLs using `asyncio` and `aiohttp`, improving application responsiveness.
-*   `normalize_url`: Standardizes URLs by handling trailing slashes consistently.
-*   `generate_qr_code`: Generates QR codes for shortened URLs, enhancing user experience and sharing capabilities.
-*   `custom_openapi`: Customizes the OpenAPI schema for improved documentation and clarity.
+*   **`normalize_url`:** Standardizes URLs by handling trailing slashes consistently.
+*   **`generate_qr_code`:** Generates QR codes for shortened URLs, enhancing user experience and sharing capabilities.
+*   **`custom_openapi`:** Customizes the OpenAPI schema for improved documentation and clarity.
 
 **API Endpoints**
 
 *   **`/`:** A simple welcome message endpoint.
 *   **`/about`:** An HTML page providing information about the URL shortener.
 *   **`/api/register_api_key`:** Registers new API keys, enabling secure access to the API.
+*   **`/api/deactivate_api_key`:** Deactivates API keys, disabling further access.
+*   **`/api/refresh_token`:** Refreshes JWT tokens for continued authentication.
+*   **`/capture_screen`:** Captures a screenshot of a target website and stores the image.
+*   **`/check-phishing`:** Checks if a target URL is associated with phishing activities.
+*   **`/preview_url`:** Displays a preview of the target URL, including title and favicon.
 *   **`/{url_key}`:** Redirects users from shortened URLs to their original targets, handling potential errors gracefully.
 *   **`/url`:** Creates new shortened URLs, optionally with custom keys (for authorized users), and initiates background tasks to fetch page information.
 *   **`/user/info`:** Provides user-specific information like the count of shortened URLs.
 *   **`/user/urls`:** Retrieves a list of shortened URLs created by a specific user.
+*   **`/user/url/status`:** Updates the status of a specific URL owned by the user.
 *   **`/admin/{secret_key}`:** Fetches detailed information and management options for a shortened URL based on its secret key.
 *   **`/admin/{secret_key}` (DELETE):** Deletes a shortened URL based on its secret key.
 *   **`/ws/url_update/{secret_key}`:** A websocket endpoint for real-time updates on URL information.
 
-This enhanced description provides a more comprehensive overview of the key functions and endpoints within `main.py`, highlighting their roles in URL shortening, user management, asynchronous operations, and overall API functionality.
+### การนำ title, favicon url เพิ่มในฐานข้อมูล
 
-
-การนำ title, favicon url เพิ่มในฐานข้อมูล
-
-## ความสัมพันธ์ของ 3 ฟังก์ชัน fetch_page_info, fetch_page_info_and_update_sync, fetch_page_info_and_update
+## ความสัมพันธ์ของ 3 ฟังก์ชัน `fetch_page_info`, `fetch_page_info_and_update_sync`, `fetch_page_info_and_update`
 
 ทั้งสามฟังก์ชันนี้ทำงานร่วมกันเพื่อดึงข้อมูล title และ favicon จาก URL ที่กำหนดให้ และอัปเดตข้อมูลเหล่านี้ลงในฐานข้อมูล โดยมีการแบ่งหน้าที่และการทำงานแบบ asynchronous และ synchronous ดังนี้
 
@@ -116,9 +119,12 @@ location / {
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
 
-		# รองรับ WebSocket
+		        # รองรับ WebSocket
+
                 proxy_http_version 1.1;
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection "Upgrade";
-        }
+}
 ```
+
+---
