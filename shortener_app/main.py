@@ -37,6 +37,7 @@ import sys
 import os
 import socket
 from ipaddress import ip_network, ip_address, IPv6Address, IPv4Address
+import httpx
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -83,6 +84,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 SECRET_TOKEN = SECRET_KEY
+
+RESERVED_KEYS = {"apps", "docs", "redoc", "openapi", "about", "api", "url", "user", "admin", "login", "register"}
 
 models.Base.metadata.create_all(bind=engine)
 models.BaseAPI.metadata.create_all(bind=engine_api)
@@ -498,8 +501,6 @@ async def preview_url(request: Request, url: str, token: str = Header(...)):
         "app_path": get_settings().safe_host
     })
 
-import httpx
-
 async def call_preview_url_async(url: str, token: str):
     base_url = get_settings().base_url
     preview_url = base_url + "/preview_url"
@@ -602,14 +603,18 @@ async def create_url(
     if url.custom_key:
         if role_id is not None and role_id not in [2, 3]:
             raise_forbidden(message="You do not have permission to use custom keys")
-            
-        
+
         if not keygen.is_valid_custom_key(url.custom_key):
             raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
+        
         if len(url.custom_key) > 15:
             raise_bad_request(message="Your provided custom key is too long. It should not exceed 15 characters.")
+        
         if crud.get_db_url_by_customkey(db, url.custom_key):
             raise_already_used(message=f"The custom key '{url.custom_key}' is already in use. Please choose a different key.")
+
+        if url.custom_key.lower() in RESERVED_KEYS:
+            raise_bad_request(message=f"The custom key '{url.custom_key}' is reserved and cannot be used.")
     
     # ตรวจสอบว่ามี  URL Target นี้อยู่แล้วหรือไม่สำหรับ API key นี้
     # ต้องทำเพิ่มกรณีที่มีการ custom key shorten url ให้มีการซ้ำได้ แต่ custom key ต้องไม่ซ้ำ
