@@ -24,7 +24,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for url in user_urls %}
+                    {% for url in user_urls | sort(attribute='created_at', reverse=True)%}
                     {% set status = url.status if url.status else '' %}
                     <tr id="row-{{ url.key }}" {% if status and status.upper() == 'DANGER' %} style="background-color: #ffcccc;" {% endif %}>
                         <td style="width: 35%;">

@@ -52,13 +52,13 @@ def index():
 
     if current_user.is_authenticated:
         # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
-        user_urls = get_user_urls()
-        url_count = len(user_urls)
+        # user_urls = get_user_urls()
+        # url_count = len(user_urls)
+
         # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
-        sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+        # sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
         
-        
-        return render_template('main/index.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count)
+        return render_template('main/index.html', app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name)
     return render_template('main/index.html', app_path=app_path, shortener_host=current_app.config['SHORTENER_HOST'], app_host_name=app_host_name, shortener_host_name=shortener_host_name)
 
 @main.route("/capture_screenshot", methods=["POST"])
@@ -132,9 +132,10 @@ def user():
     user_urls = get_user_urls()
     url_count = len(user_urls)
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
-    sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    ## sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+
     # Convert 'created_at' and 'updated_at' to local time
-    for url in sorted_user_urls:
+    for url in user_urls:
         url['created_at'] = convert_to_localtime(url['created_at'])
         url['updated_at'] = convert_to_localtime(url['updated_at'])
 
@@ -182,7 +183,7 @@ def user():
             
             return redirect(url_for('main.user'))
     
-    return render_template('main/user.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/user.html', user_urls=user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/vip', methods=['GET', 'POST'])
 @login_required
@@ -202,9 +203,12 @@ def vip():
     url_count = len(user_urls)
 
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
-    sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    ## sorted_user_urls = sorted(user_urls, key=lambda x: x['created_at'], reverse=True)
+    ## ให้การจัดเรียงเป็นหน้าที่ทางฝั่ง html แทน
+    ## sorted_user_urls = user_urls
+
     # Convert 'created_at' and 'updated_at' to local time
-    for url in sorted_user_urls:
+    for url in user_urls:
         url['created_at'] = convert_to_localtime(url['created_at'])
         url['updated_at'] = convert_to_localtime(url['updated_at'])
 
@@ -252,7 +256,7 @@ def vip():
                 flash('Failed to delete URL', 'danger')
             return redirect(url_for('main.vip'))
 
-    return render_template('main/vip.html', user_urls=sorted_user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
+    return render_template('main/vip.html', user_urls=user_urls, app_path=app_path, shortener_host=shortener_host, shortener_host_name=shortener_host_name, app_host_name=app_host_name, url_count=url_count, url_action_form=url_action_form, scan_results=scan_results_list)
 
 @main.route('/about')
 def about():
