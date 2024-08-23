@@ -2,7 +2,7 @@
  User Management from https://github.com/hack4impact/flask-base 
  Modified the code to be compatible with the new version of the library.
  
- URL Shorten Project
+ URL Shortener Project
 
 # Flask Application
 
@@ -52,7 +52,6 @@ Key configuration variables can be set in a `config.env` file in the root direct
 The application uses SQLAlchemy and supports multiple database bindings:
 
 - Main database: Configured via `SQLALCHEMY_DATABASE_URI`
-- Shortener database: Configured via `SQLALCHEMY_BINDS['shortener_db']`
 
 Different database URLs are used for development, testing, and production environments.
 
@@ -80,7 +79,6 @@ The application uses SQLAlchemy for database operations. Models include:
 
 - User
 - Role
-- ShortenedURL ***
 
 ## Running the Application
 
