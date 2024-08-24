@@ -24,3 +24,4 @@ user_management/app/static/favicon.ico
 *.png
 user_management/app/templates/main/preview_.html
 shortener_app/openapi_shorten_url.json
+/venv

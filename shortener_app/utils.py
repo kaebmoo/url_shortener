@@ -29,7 +29,7 @@ async def fetch_content_type(url):
         print(f"Connection error: {e}")
         return None
         
-async def capture_screenshot(url: str):
+# async def capture_screenshot(url: str):
     '''content_type = await fetch_content_type(url)
     if 'text/html' not in content_type:
         print(f"URL is not an HTML page, content type: {content_type}")

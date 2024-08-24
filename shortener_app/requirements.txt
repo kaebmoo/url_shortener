@@ -10,3 +10,5 @@ jwt
 jinja2
 aiofiles
 beautifulsoup4
+httpx
+aiohttp
