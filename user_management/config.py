@@ -97,7 +97,6 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-dev.sqlite'))
     SQLALCHEMY_BINDS = { 
-        'shortener_db': os.environ.get('DEV_SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener.db')),
         'blacklist_db': os.environ.get('DEV_BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
 
@@ -112,7 +111,6 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-test.sqlite'))
     SQLALCHEMY_BINDS = { 
-        'shortener_db': os.environ.get('TEST_SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener-test.db')),
         'blacklist_db': os.environ.get('TEST_BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
     WTF_CSRF_ENABLED = False
@@ -129,7 +127,6 @@ class ProductionConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'user_management.sqlite'))
     SQLALCHEMY_BINDS = { 
-        'shortener_db': os.environ.get('SHORTENER_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'shortener.db')),
         'blacklist_db': os.environ.get('BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
     SSL_DISABLE = (os.environ.get('SSL_DISABLE', 'True') == 'True')

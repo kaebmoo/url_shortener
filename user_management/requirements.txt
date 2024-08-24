@@ -18,6 +18,6 @@ gevent
 flask_rq2
 flask_socketio
 phonenumbers
-PyJWT
+PyJWT==2.8.0
 playwright
 cryptography

@@ -5,6 +5,7 @@ from flask_assets import Environment
 from flask_compress import Compress
 from flask_login import LoginManager
 from flask_mail import Mail
+from flask_migrate import Migrate
 # from flask_rq import RQ
 from flask_rq2 import RQ
 from rq import Queue
@@ -23,6 +24,7 @@ db = SQLAlchemy()
 csrf = CSRFProtect()
 compress = Compress()
 rq = RQ()
+migrate = Migrate()
 
 # Set up Flask-Login
 login_manager = LoginManager()
@@ -54,6 +56,7 @@ def create_app(config):
     login_manager.init_app(app)
     csrf.init_app(app)
     compress.init_app(app)
+    migrate.init_app(app, db)  # อย่าลืมเรียกใช้ migrate.init_app
     
     # socketio = SocketIO(app)
     socketio.init_app(app, async_mode='gevent')  # eventlet

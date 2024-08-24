@@ -5,7 +5,7 @@ import requests
 from urllib.parse import urlparse
 import asyncio
 
-from app.models import EditableHTML, ShortenedURL
+from app.models import EditableHTML
 from app.main.forms import URLActionForm
 from app.utils import generate_qr_code, convert_to_localtime, capture_screenshot, validate_and_correct_url, validate_url
 from app.apicall import get_user_urls, get_url_scan_status
@@ -51,7 +51,7 @@ def index():
     shortener_host_name = current_app.config['SHORTENER_HOST_NAME']
 
     if current_user.is_authenticated:
-        # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
+        
         # user_urls = get_user_urls()
         # url_count = len(user_urls)
 
@@ -128,7 +128,6 @@ def user():
     # Initialize scan_results_list to a default value
     scan_results_list = []
 
-    # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
     # จัดเรียงลิสต์ตาม 'created_at' โดยให้วันที่ใหม่ที่สุดมาก่อน
@@ -198,7 +197,6 @@ def vip():
     shortener_host = current_app.config['SHORTENER_HOST']
     shortener_host_name = current_app.config['SHORTENER_HOST_NAME']
 
-    # user_urls = ShortenedURL.query.filter(ShortenedURL.api_key == current_user.uid, ShortenedURL.is_active == 1).all()
     user_urls = get_user_urls()
     url_count = len(user_urls)
 

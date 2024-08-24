@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import subprocess
+import uuid
 
 # https://stackoverflow.com/questions/68527489/cant-import-migratecommand-from-flask-migrate
 from flask_migrate import Migrate # from flask_migrate import Migrate, MigrateCommand
@@ -10,7 +11,8 @@ from redis import Redis
 from rq import Connection, Queue, Worker
 from rq.exceptions import NoSuchJobError   # Import the exception
 from app import create_app, db
-from app.models import Role, User, ShortenedURL
+from app.models import Role, User
+from app.models.miscellaneous import EditableHTML
 from config import Config
 
 import logging
@@ -32,7 +34,7 @@ def inject_asset_path():
 
 @app.shell_context_processor
 def make_shell_context():
-    return {'db': db, 'User': User, 'Role': Role, 'ShortenedURL': ShortenedURL}
+    return {'db': db, 'User': User, 'Role': Role, 'EditableHTML': EditableHTML}
 
 
 @app.cli.command("test")
@@ -67,12 +69,14 @@ def add_fake_data(number_users):
 @app.cli.command()
 def setup_dev():
     """Runs the set-up needed for local development."""
+    print("Running setup_general...")
     setup_general()
 
 
 @app.cli.command()
 def setup_prod():
     """Runs the set-up needed for production."""
+    print("Running setup_general...")
     setup_general()
 
 
@@ -83,12 +87,14 @@ def setup_general():
     admin_query = Role.query.filter_by(name='Administrator')
     if admin_query.first() is not None:
         if User.query.filter_by(email=Config.ADMIN_EMAIL).first() is None:
+            uid = uuid.uuid4().hex
             user = User(
                 first_name='Admin',
                 last_name='Account',
                 password=Config.ADMIN_PASSWORD,
                 confirmed=True,
-                email=Config.ADMIN_EMAIL)
+                email=Config.ADMIN_EMAIL,
+                uid=uid)
             db.session.add(user)
             db.session.commit()
             print('Added administrator {}'.format(user.full_name()))
