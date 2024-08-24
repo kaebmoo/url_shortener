@@ -25,3 +25,7 @@ user_management/app/static/favicon.ico
 user_management/app/templates/main/preview_.html
 shortener_app/openapi_shorten_url.json
 /venv
+/shortener_app/apikey
+/shortener_app/blacklist
+shortener_app/blacklist.db
+blacklist.db

@@ -61,6 +61,7 @@ class Blacklist(BaseBlacklist):
     date_added = Column(Date, nullable=False)               # วันที่เพิ่ม URL เข้า blacklist
     reason = Column(String(500), nullable=False)            # เหตุผลที่ URL ถูกบล็อค
     status = Column(Boolean, nullable=True)                 # สถานะของ URL (true/false)
+    source = Column(String(500), nullable=False)            # แหล่งที่มาของ blacklist
 
 # ฟังก์ชันนี้จะทำให้แน่ใจว่า updated_at ถูกอัปเดตเมื่อมีการอัปเดตแถว
 @event.listens_for(URL, 'before_update')

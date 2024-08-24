@@ -121,3 +121,188 @@ async def startup():
 
 * คุณสามารถเรียนรู้เพิ่มเติมเกี่ยวกับ Alembic ได้จากเอกสารอย่างเป็นทางการ: [https://alembic.sqlalchemy.org/](https://alembic.sqlalchemy.org/)
 * หากคุณต้องการปรับแต่งวิธีการสร้างตารางหรือมี logic เพิ่มเติม คุณสามารถแก้ไขไฟล์ migration ที่ Alembic สร้างขึ้นได้
+
+
+การสร้างฐานข้อมูลแยกกันรวมถึงวิธีการแก้ไขไฟล์ `env.py` สำหรับแต่ละฐานข้อมูล:
+
+### 1. Initialize Alembic สำหรับแต่ละฐานข้อมูล
+เริ่มต้น Alembic environment สำหรับแต่ละฐานข้อมูล:
+
+```bash
+alembic init alembic       # สำหรับฐานข้อมูล shortener.db
+alembic init apikey        # สำหรับฐานข้อมูล apikey.db
+alembic init blacklist     # สำหรับฐานข้อมูล blacklist.db
+```
+
+### 2. แก้ไขไฟล์ `env.py` สำหรับแต่ละฐานข้อมูล
+สำหรับแต่ละฐานข้อมูล คุณต้องแก้ไขไฟล์ `env.py` ในโฟลเดอร์ Alembic ที่ถูกสร้างขึ้น
+
+#### 2.1 `env.py` สำหรับ `shortener.db`
+
+แก้ไขไฟล์ `shortener_app/alembic/env.py` ดังนี้:
+
+```python
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+import sys
+import os
+
+# เพิ่ม path ของโปรเจคให้ถูกต้อง
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# นำเข้า Base ที่ใช้กับ shortener.db
+from shortener_app.database import Base
+from shortener_app.models import *  # นำเข้าทุก model ที่เกี่ยวข้องกับ shortener.db
+
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+target_metadata = Base.metadata
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+```
+
+#### 2.2 `env.py` สำหรับ `apikey.db`
+
+แก้ไขไฟล์ `shortener_app/apikey/env.py` ดังนี้:
+
+```python
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+import sys
+import os
+
+# เพิ่ม path ของโปรเจคให้ถูกต้อง
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# นำเข้า BaseAPI ที่ใช้กับ apikey.db
+from shortener_app.database import BaseAPI
+from shortener_app.models import APIKey, Role  # นำเข้าทุก model ที่เกี่ยวข้องกับ apikey.db
+
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+target_metadata = BaseAPI.metadata
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+```
+
+#### 2.3 `env.py` สำหรับ `blacklist.db`
+
+แก้ไขไฟล์ `shortener_app/blacklist/env.py` ดังนี้:
+
+```python
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config, pool
+from alembic import context
+import sys
+import os
+
+# เพิ่ม path ของโปรเจคให้ถูกต้อง
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# นำเข้า BaseBlacklist ที่ใช้กับ blacklist.db
+from shortener_app.database import BaseBlacklist
+from shortener_app.models import Blacklist  # นำเข้าทุก model ที่เกี่ยวข้องกับ blacklist.db
+
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+target_metadata = BaseBlacklist.metadata
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"},
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+```
+
+### 3. สร้าง Migrations แยกกันสำหรับแต่ละฐานข้อมูล
+ใช้คำสั่ง `alembic revision --autogenerate` สำหรับแต่ละ environment เพื่อสร้าง migration files:
+
+```bash
+alembic alembic revision --autogenerate -m "create initial tables for shortener.db"
+alembic -n apikey revision --autogenerate -m "create initial tables for apikey.db"
+alembic -n blacklist revision --autogenerate -m "create initial tables for blacklist.db"
+```
+
+### 4. Apply Migrations ให้กับแต่ละฐานข้อมูล
+ใช้คำสั่ง `alembic upgrade head` เพื่อปรับใช้ migration ที่สร้างขึ้นกับแต่ละฐานข้อมูล:
+
+```bash
+alembic upgrade head                       # อัปเกรดฐานข้อมูล shortener.db
+alembic -n apikey upgrade head             # อัปเกรดฐานข้อมูล apikey.db
+alembic -n blacklist upgrade head          # อัปเกรดฐานข้อมูล blacklist.db
+```
+
+การทำตามขั้นตอนนี้จะช่วยให้คุณสามารถจัดการ migrations สำหรับแต่ละฐานข้อมูลได้อย่างแยกส่วนและเป็นระเบียบครับ
