@@ -667,7 +667,14 @@ async def get_user_url(
     user_urls_json = jsonable_encoder(user_urls)
 
     # Use Pydantic models to filter and return the desired fields
-    filtered_urls = [schemas.URLUser(**url).model_dump() for url in user_urls_json]
+    ## filtered_urls = [schemas.URLUser(**url).model_dump() for url in user_urls_json]
+
+    # Use Pydantic models to filter and return the desired fields
+    filtered_urls = []
+    for url in user_urls_json:
+        if url.get('status') is None:
+            url['status'] = ''  # or another default value
+        filtered_urls.append(schemas.URLUser(**url).model_dump())
 
     # ใช้ jsonable_encoder เพื่อแปลง datetime ให้เป็น string
     json_compatible_data = jsonable_encoder(filtered_urls)

@@ -149,3 +149,19 @@
         {{ field(placeholder=field.label.text) }}
     {% endif %}
 {% endmacro %}
+
+{% macro form_message(messages, header, class) %}
+  {% if messages %}
+    <div class="ui {{ class }} message flash-message" data-header="{{ header }}">
+      <i class="close icon"></i>
+      <div class="header">
+        {{ header }}
+      </div>
+      <ul class="list">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endmacro %}

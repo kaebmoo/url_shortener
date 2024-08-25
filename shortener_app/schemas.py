@@ -34,7 +34,7 @@ class URLUser(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     is_checked: bool
-    status: str
+    status: Optional[str] = Field(default="")
     title: Optional[str] = None
     favicon_url: Optional[HttpUrl] = None
 

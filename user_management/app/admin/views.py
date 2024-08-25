@@ -85,15 +85,18 @@ def blacklist_add_url():
 
         existing_url = URL.query.filter_by(url=url).first()
         if existing_url:
-            return jsonify({'status': 'error', 'message': 'URL already exists'}), 400
+            flash('URL already exists', 'error')
+            return redirect(url_for('admin.blacklist'))
         
         new_url = URL(url=url, category=category, reason=reason, source=source, date_added=db.func.current_date())
         db.session.add(new_url)
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'URL added successfully'})
+        
+        flash('URL added successfully', 'success')
+        return redirect(url_for('admin.blacklist'))
     else:
-        return jsonify({'status': 'error', 'message': 'Invalid input'}), 400
-
+        flash('Invalid input', 'error')
+        return redirect(url_for('admin.blacklist'))
 
 @admin.route('/blacklist/remove/<int:id>')
 @login_required
@@ -104,7 +107,9 @@ def blacklist_remove_url(id):
         abort(404)
     db.session.delete(url)
     db.session.commit()
-    return jsonify({'status': 'success', 'message': 'URL removed successfully'})
+
+    flash('URL removed successfully', 'success')
+    return redirect(url_for('admin.blacklist'))
 
 @admin.route('/blacklist/toggle/<int:id>')
 @login_required
@@ -115,7 +120,9 @@ def blacklist_toggle_status(id):
         abort(404)
     url.status = not url.status
     db.session.commit()
-    return jsonify({'status': 'success', 'message': 'Status updated successfully'})
+
+    flash('Status updated successfully', 'success')
+    return redirect(url_for('admin.blacklist'))
 
 @admin.route('/blacklist/search', methods=['GET'])
 @login_required
@@ -145,19 +152,20 @@ def blacklist_export_data(format):
         cw.writerow(['url', 'category', 'date_added', 'reason', 'source', 'status'])
         for url in urls:
             cw.writerow([url.url, url.category, url.date_added, url.reason, url.source, url.status])
-            current_app.socketio.emit('export_progress', {'status': 'Exporting data...', 'url': url.url})
         output = make_response(si.getvalue())
         output.headers["Content-Disposition"] = "attachment; filename=urls.csv"
         output.headers["Content-type"] = "text/csv"
+        flash('CSV exported successfully', 'success')
         return output
     elif format == 'json':
         data = [{'url': url.url, 'category': url.category, 'date_added': str(url.date_added), 
                  'reason': url.reason, 'source': url.source, 'status': url.status} for url in urls]
         output = BytesIO(json.dumps(data, indent=2).encode('utf-8'))
-        current_app.socketio.emit('export_progress', {'status': 'Exporting data...', 'total': len(data)})
+        flash('JSON exported successfully', 'success')
         return send_file(output, mimetype='application/json', as_attachment=True, download_name='urls.json')
     else:
-        return jsonify({'error': 'Invalid format'}), 400
+        flash('Invalid format', 'error')
+        return redirect(url_for('admin.blacklist'))
 
 @admin.route('/blacklist/import', methods=['POST'])
 @login_required
@@ -167,58 +175,55 @@ def blacklist_import_data():
     if form.validate_on_submit():
         if 'file' not in request.files:
             flash('No file part', 'error')
-            return jsonify({'error': 'No file part'}), 400
+            return redirect(url_for('admin.blacklist'))
+        
         file = request.files['file']
         if file.filename == '':
             flash('No selected file', 'error')
-            return jsonify({'error': 'No selected file'}), 400
+            return redirect(url_for('admin.blacklist'))
         
         try:
-            count = 0
             if file and file.filename.endswith('.csv'):
                 stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
                 csv_reader = csv.DictReader(stream)
-                total_rows = sum(1 for row in csv_reader)
-                stream.seek(0)
-                csv_reader = csv.DictReader(stream)
-                
                 for row in csv_reader:
                     existing_url = URL.query.filter_by(url=row['url']).first()
                     if existing_url:
                         continue
                     url = URL(url=row['url'], category=row['category'], 
-                            date_added=parse_date(row['date_added']).date(), 
-                            reason=row['reason'], source=row['source'], status=row['status'] in ['1', 'True'])
+                              date_added=parse_date(row['date_added']).date(), 
+                              reason=row['reason'], source=row['source'], status=row['status'] in ['1', 'True'])
                     db.session.add(url)
-                    count += 1
-                    if count % 100 == 0:
-                        current_app.socketio.emit('import_progress', {'status': 'Importing data...', 'count': count, 'total': total_rows})
                 db.session.commit()
-                return jsonify({'message': 'CSV imported successfully'}), 200
+
+                flash('CSV imported successfully', 'success')
+                return redirect(url_for('admin.blacklist'))
             elif file and file.filename.endswith('.json'):
                 data = json.load(file)
-                total_rows = len(data)
-                for index, item in enumerate(data):
+                for item in data:
                     existing_url = URL.query.filter_by(url=item['url']).first()
                     if existing_url:
                         continue
                     url = URL(url=item['url'], category=item['category'], 
-                            date_added=parse_date(item['date_added']).date(), 
-                            reason=item['reason'], source=item['source'], status=item['status'])
+                              date_added=parse_date(item['date_added']).date(), 
+                              reason=item['reason'], source=item['source'], status=item['status'])
                     db.session.add(url)
-                    count += 1
-                    if count % 100 == 0:
-                        current_app.socketio.emit('import_progress', {'status': 'Importing data...', 'count': count, 'total': total_rows})
                 db.session.commit()
-                return jsonify({'message': 'JSON imported successfully'}), 200
+
+                flash('JSON imported successfully', 'success')
+                return redirect(url_for('admin.blacklist'))
             else:
-                return jsonify({'error': 'Invalid file format'}), 400
+                flash('Invalid file format', 'error')
+                return redirect(url_for('admin.blacklist'))
         except IntegrityError:
             db.session.rollback()
-            return jsonify({'error': 'An error occurred while importing data'}), 500
+            flash('An error occurred while importing data', 'error')
+            return redirect(url_for('admin.blacklist'))
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    return jsonify({'error': 'CSRF token missing or incorrect'}), 400
+            flash(f'An error occurred: {str(e)}', 'error')
+            return redirect(url_for('admin.blacklist'))
+    return redirect(url_for('admin.blacklist'))
+
 
 @admin.route('/new-user', methods=['GET', 'POST'])
 @login_required
