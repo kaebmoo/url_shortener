@@ -10,6 +10,14 @@
         <i class="exclamation triangle icon" style="color: red; font-size: 24px;" title="This is dangerous"></i> = 'DANGER'
     </h2>
     <div class="ui segment">
+        <div class="ui menu">
+            <div class="ui right search item">
+                <div class="ui transparent icon input">
+                    <input id="search-urls" type="text" placeholder="Search urls…">
+                    <i class="search icon"></i>
+                </div>
+            </div>
+        </div>
         <div class="ui scrolling container">
             <table class="ui celled table">
                 <thead>
@@ -236,5 +244,29 @@
             }, 100); // You can adjust this delay if needed
         }
     });
+
+    
+    $(document).ready(function () {
+        $('#search-urls').keyup(function () {
+            var searchText = $(this).val();
+            if (searchText.length > 0) {
+                $('tbody td:icontains(' + searchText + ')').addClass('positive');
+                $('td.positive').not(':icontains(' + searchText + ')').removeClass('positive');
+                $('tbody td').not(':icontains(' + searchText + ')').closest('tr').addClass('hidden').hide();
+                $('tr.hidden:icontains(' + searchText + ')').removeClass('hidden').show();
+            } else {
+                $('td.positive').removeClass('positive');
+                $('tr.hidden').removeClass('hidden').show();
+            }
+        });
+
+        $('#select-role').dropdown({
+            onChange: function (value, text, $selectedItem) {
+                $('td.user.role:contains(' + value + ')').closest('tr').removeClass('hidden').show();
+                $('td.user.role').not(':contains(' + value + ')').closest('tr').addClass('hidden').hide();
+            }
+        });
+    });
+
 </script>
 {% endblock %}
