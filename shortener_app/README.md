@@ -128,3 +128,108 @@ location / {
 ```
 
 ---
+
+ตัวอย่างการใช้งาน API ด้วย `curl`:
+
+### 1. **POST /api/register_api_key**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/api/register_api_key" \
+   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+   -H "Content-Type: application/json" \
+   -d '{"api_key": "YOUR_API_KEY", "role_id": 1}'
+   ```
+
+### 2. **POST /api/deactivate_api_key**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/api/deactivate_api_key" \
+   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+   -H "Content-Type: application/json" \
+   -d '{"api_key": "YOUR_API_KEY"}'
+   ```
+
+### 3. **POST /api/refresh_token**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/api/refresh_token" \
+   -H "Content-Type: application/json" \
+   -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
+   ```
+
+### 4. **POST /capture_screen**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/capture_screen" \
+   -H "X-API-KEY: YOUR_API_KEY" \
+   -H "Content-Type: application/json" \
+   -d '{"url_key": "YOUR_URL_KEY"}'
+   ```
+
+### 5. **GET /preview_url**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/preview_url" \
+   -H "token: YOUR_SECRET_TOKEN" \
+   -d "url=https://example.com"
+   ```
+
+### 6. **GET /check-phishing/**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/check-phishing/?url=https://example.com"
+   ```
+
+### 7. **GET /{url_key}**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/{url_key}"
+   ```
+
+### 8. **POST /url**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/url" \
+   -H "X-API-KEY: YOUR_API_KEY" \
+   -H "Content-Type: application/json" \
+   -d '{"target_url": "https://example.com", "custom_key": "custom-key"}'
+   ```
+
+### 9. **GET /user/info**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/user/info" \
+   -H "X-API-KEY: YOUR_API_KEY"
+   ```
+
+### 10. **GET /user/urls**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/user/urls" \
+   -H "X-API-KEY: YOUR_API_KEY"
+   ```
+
+### 11. **POST /user/url/status**
+   **Request:**
+   ```bash
+   curl -X POST "https://kaebmoo.com/user/url/status" \
+   -H "X-API-KEY: YOUR_API_KEY" \
+   -H "Content-Type: application/json" \
+   -d '{"secret_key": "YOUR_SECRET_KEY", "target_url": "https://example.com"}'
+   ```
+
+### 12. **GET /admin/{secret_key}**
+   **Request:**
+   ```bash
+   curl -X GET "https://kaebmoo.com/admin/{secret_key}" \
+   -H "X-API-KEY: YOUR_API_KEY"
+   ```
+
+### 13. **DELETE /admin/{secret_key}**
+   **Request:**
+   ```bash
+   curl -X DELETE "https://kaebmoo.com/admin/{secret_key}" \
+   -H "X-API-KEY: YOUR_API_KEY"
+   ```
+
+**หมายเหตุ:** โปรดแทนที่ `YOUR_JWT_TOKEN`, `YOUR_API_KEY`, `YOUR_URL_KEY`, `YOUR_SECRET_KEY`, และ `YOUR_SECRET_TOKEN` ด้วยค่าจริงที่เหมาะสม.
