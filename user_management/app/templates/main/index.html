@@ -2,7 +2,7 @@
 
 {% block content %}
     <div class="ui container">
-      <h1>Hello {% if not (current_user.is_authenticated) %} world {% else %} {{ current_user.full_name() }} {% endif %}.</h1>
+      <h1>Welcome, {% if not (current_user.is_authenticated) %} world {% else %} {{ current_user.full_name() }} {% endif %}</h1>
       <h2>Share Your Links with Confidence!</h2>
       {% if current_user.is_authenticated %}
       <h2></h2>

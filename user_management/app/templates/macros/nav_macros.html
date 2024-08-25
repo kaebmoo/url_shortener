@@ -37,12 +37,12 @@
 
       {# ตรวจสอบ permission โดยใช้ current_user.can() #}
       {% if current_user.role.name == 'Administrator' %}
-        {% set user = user + [('main.vip', 'VIP Dashboard', 'table')] %}
+        {% set user = user + [('main.vip', 'URLs Dashboard', 'table')] %}
         {% set user = user + [('admin.index', 'Admin Dashboard', 'user shield')] %}
       {% elif current_user.role.name == 'VIP' %}
-        {% set user = user + [('main.vip', 'VIP Dashboard', 'table')] %}
+        {% set user = user + [('main.vip', 'URLs Dashboard', 'table')] %}
       {% elif current_user.role.name == 'User' %}
-        {% set user = user + [('main.user', 'User Dashboard', 'table')] %}
+        {% set user = user + [('main.user', 'URLs Dashboard', 'table')] %}
       {% endif %}
     
     {% endif %} 
