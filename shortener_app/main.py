@@ -484,7 +484,7 @@ async def capture_screen(
         logging.error(f"Unexpected error occurred: {e}")
         raise HTTPException(status_code=500, detail="Unable to capture screenshot.")
     
-    return {"screenshot_path": screenshot_path, "url": db_url.target_url}
+    return {"base_url": get_settings().base_url, "screenshot_path": screenshot_path, "url": db_url.target_url}
 
 @app.get("/preview_url")
 async def preview_url(request: Request, url: str, token: str = Header(...)):

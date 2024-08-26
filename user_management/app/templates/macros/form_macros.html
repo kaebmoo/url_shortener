@@ -14,7 +14,8 @@
         'error':   get_flashed_messages(category_filter=['form-error']),
         'warning': get_flashed_messages(category_filter=['form-check-email']),
         'info':    get_flashed_messages(category_filter=['form-info']),
-        'success': get_flashed_messages(category_filter=['form-success'])
+        'success': get_flashed_messages(category_filter=['form-success']),
+        'progress': get_flashed_messages(category_filter=['progress']) 
     } %}
 
     {{ begin_form(form, flashes, method=method, extra_classes=extra_classes, enctype=enctype) }}
@@ -26,6 +27,7 @@
         {{ form_message(flashes['warning'], header='Check your email.', class='warning') }}
         {{ form_message(flashes['info'], header='Information', class='info') }}
         {{ form_message(flashes['success'], header='Success!', class='success') }}
+        {{ form_message(flashes['progress'], header='Progress!', class='progress') }}
 
         {% for field in form | selectattr('type', 'equalto', 'SubmitField') %}
             {{ render_form_field(field) }}
@@ -48,6 +50,7 @@
         {% elif flashes['warning'] %} warning
         {% elif flashes['info'] %} info
         {% elif flashes['success'] %} success
+        {% elif flashes['progress'] %} progress
         {% endif %}">
     {{ form.hidden_tag() }}
 {% endmacro %}

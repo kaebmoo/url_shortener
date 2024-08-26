@@ -69,7 +69,7 @@ class Config:
     SHORTENER_HOST_NAME = os.getenv('SHORTENER_HOST_NAME', 'http://localhost')
     ASSET_PATH = os.getenv('ASSET_PATH', '')
 
-    REDIS_URL = os.getenv('REDISTOGO_URL', 'http://localhost:6379')
+    REDIS_URL = os.getenv('REDISTOGO_URL', 'redis://127.0.0.1:6379')
 
     RAYGUN_APIKEY = os.environ.get('RAYGUN_APIKEY')
 

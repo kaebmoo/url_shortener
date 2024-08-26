@@ -13,6 +13,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from flask_socketio import SocketIO
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_cors import CORS
+from flask_sse import sse
 
 from app.assets import app_css, app_js, vendor_css, vendor_js
 from config import config as Config
@@ -39,6 +41,11 @@ def create_app(config):
     app.config['APPLICATION_ROOT'] = '/'
     # app.config['ASSET_URL'] = 'static'
 
+    app.config["REDIS_URL"] = "redis://127.0.0.1"
+    app.register_blueprint(sse, url_prefix='/stream')
+
+    CORS(app)   # for suppport client cross side 
+    
     config_name = config
 
     if not isinstance(config, str):

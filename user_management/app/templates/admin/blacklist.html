@@ -18,7 +18,8 @@
                 'error':   get_flashed_messages(category_filter=['form-error']),
                 'warning': get_flashed_messages(category_filter=['form-check-email']),
                 'info':    get_flashed_messages(category_filter=['form-info']),
-                'success': get_flashed_messages(category_filter=['form-success'])
+                'success': get_flashed_messages(category_filter=['form-success']),
+                'progress': get_flashed_messages(category_filter=['progress'])
             } %}
 
             {{ f.form_message(flashes['error'], header='Something went wrong.', class='error') }}
@@ -57,6 +58,13 @@
             <!-- Divider -->
             <div class="ui horizontal divider" style="text-align: left;">
                 Import/Export Blacklist URLs
+            </div>
+
+            <!-- Progress bar section -->
+            <div class="ui progress" id="progress-bar" style="display: none;">
+                <div class="bar" style="width: 0%;">
+                    <div class="progress">0%</div>
+                </div>
             </div>
 
             <!-- Section 2: Import and Export -->
@@ -173,6 +181,7 @@
 
     <script type="text/javascript">
         $(document).ready(function () {
+
             // Filter functionality for the table
             $('#search-urls').keyup(function () {
                 var searchText = $(this).val();
@@ -186,51 +195,60 @@
                     $('tr.hidden').removeClass('hidden').show();
                 }
             });
-        });
-
-        // Automatically submit the form when a file is selected
-        document.getElementById('fileInput').addEventListener('change', function() {
-            if (this.files.length) {
-                this.form.submit(); // Automatically submit the form when a file is selected
-            }
-        });
-
-        // handle flash message by macro & java script: macro form_message(messages, header, class)
-        /*
         
-        document.addEventListener('DOMContentLoaded', () => {
-            const flashMessages = document.querySelectorAll('.flash-message');
-
-            flashMessages.forEach(message => {
-                // สร้าง Modal
-                const modal = document.createElement('div');
-                modal.classList.add('ui', 'modal');
-
-                // สร้างเนื้อหาภายใน Modal
-                const modalContent = document.createElement('div');
-                modalContent.classList.add('content');
-                modalContent.innerHTML = `
-                    <div class="header">${message.dataset.header}</div>
-                    <div class="description">
-                        <ul class="list">
-                            ${message.querySelector('ul').innerHTML}
-                        </ul>
-                    </div>
-                `;
-
-                modal.appendChild(modalContent);
-                document.body.appendChild(modal);
-
-                // แสดง Modal
-                $(modal).modal('show');
-
-                // ลบ Flash Message หลังจากปิด Modal
-                $(modal).on('hidden.bs.modal', function () {
-                    $(this).modal('dispose'); // ลบ Modal ออกจาก DOM
-                    message.remove(); // ลบ Flash Message ออกจาก DOM
-                });
+            // File upload and progress tracking
+            const fileInput = document.getElementById('fileInput');
+            const progressBar = document.getElementById('progress-bar');
+            const form = document.getElementById('import-form');
+        
+            fileInput.addEventListener('change', function() {
+                if (this.files.length) {
+                    progressBar.style.display = 'block';
+                    startListening();
+                    form.submit();
+                }
             });
+        
+            function updateProgressBar(percentage) {
+                const bar = progressBar.querySelector('.bar');
+                const progressText = progressBar.querySelector('.progress');
+                
+                const percentageValue = percentage + '%';  // แปลงค่าเป็นเปอร์เซ็นต์
+                bar.style.width = percentageValue;  // อัปเดตความกว้างของ progress bar
+                progressText.textContent = percentageValue;  // แสดงผล % บน bar
+            }
+
+
+        
+            function startListening() {
+                const eventSource = new EventSource("{{ url_for('sse.stream') }}");
+                console.log("เรียกใช้งาน sse.stream")
+
+                eventSource.addEventListener('progress', function(event) {
+                    const data = JSON.parse(event.data);
+
+                    if (data.message === 'complete') {
+                        eventSource.close();
+                        progressBar.style.display = 'none';
+                        window.location.assign("{{ url_for('admin.blacklist') }}");
+                    } else if (typeof data.message === 'string' && data.message.startsWith('error:')) {
+                        eventSource.close();
+                        alert('Error: ' + data.message);
+                        progressBar.style.display = 'none';
+                    } else if (!isNaN(parseInt(data.message, 10))) {
+                        updateProgressBar(parseInt(data.message, 10));
+                    } else {
+                        console.error('Invalid data:', data);
+                    }
+                });
+
+                eventSource.onerror = function() {
+                    console.error('EventSource failed. Reconnecting...');
+                    eventSource.close();
+                    setTimeout(startListening, 3000);  // Retry connection after 3 seconds
+                };
+            }
+
         });
-        */
     </script>
 {% endblock %}

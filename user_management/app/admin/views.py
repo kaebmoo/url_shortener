@@ -1,13 +1,6 @@
 from flask import (
-    Flask,
-    Blueprint,
-    abort,
-    flash,
-    redirect,
-    render_template,
-    request,
-    url_for,
-    jsonify, send_file, make_response, current_app
+    Flask, Blueprint, abort, flash, redirect, render_template, request, 
+    url_for, jsonify, send_file, make_response, current_app, Response, stream_with_context
 )
 
 from flask_login import current_user, login_required, LoginManager, UserMixin, login_user, logout_user
@@ -24,7 +17,7 @@ import uuid
 
 from rq import Queue
 from flask_sqlalchemy import SQLAlchemy
-
+from flask_sse import sse
 
 from app import db
 from app.admin.forms import (
@@ -43,12 +36,13 @@ from app.apicall import deactivate_api_key, register_api_key
 
 from email_validator import validate_email, EmailNotValidError
 import phonenumbers
+import time
 
 admin = Blueprint('admin', __name__)
 
 from redis import Redis
 # Create a Redis connection (adjust the parameters accordingly)
-redis_connection = Redis(host='localhost', port=6379, db=0)
+redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
 # Create a queue using the Redis connection
 queue = Queue(connection=redis_connection)
 
@@ -66,7 +60,7 @@ def index():
 @admin_required
 def blacklist():
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = 50
     urls = URL.query.paginate(page=page, per_page=per_page)
     form = AddURLForm()
     import_form = ImportForm()
@@ -167,6 +161,7 @@ def blacklist_export_data(format):
         flash('Invalid format', 'error')
         return redirect(url_for('admin.blacklist'))
 
+
 @admin.route('/blacklist/import', methods=['POST'])
 @login_required
 @admin_required
@@ -183,45 +178,69 @@ def blacklist_import_data():
             return redirect(url_for('admin.blacklist'))
         
         try:
+            count = 0
             if file and file.filename.endswith('.csv'):
                 stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
                 csv_reader = csv.DictReader(stream)
+                total_rows = sum(1 for row in csv_reader)
+                stream.seek(0)
+                csv_reader = csv.DictReader(stream)
+
                 for row in csv_reader:
                     existing_url = URL.query.filter_by(url=row['url']).first()
                     if existing_url:
                         continue
                     url = URL(url=row['url'], category=row['category'], 
-                              date_added=parse_date(row['date_added']).date(), 
-                              reason=row['reason'], source=row['source'], status=row['status'] in ['1', 'True'])
+                            date_added=parse_date(row['date_added']).date(), 
+                            reason=row['reason'], source=row['source'], status=row['status'] in ['1', 'True'])
                     db.session.add(url)
-                db.session.commit()
+                    count += 1
+                    # คำนวณเปอร์เซ็นต์
+                    percent = (count / total_rows) * 100
+                    if count % 100 == 0:
+                        # time.sleep(0.2)
+                        sse.publish({"message": percent}, type='progress')
 
-                flash('CSV imported successfully', 'success')
-                return redirect(url_for('admin.blacklist'))
+                db.session.commit()
+                sse.publish({"message": "complete"}, type='progress')
+                ## ให้ฝั่ง client เรียกแทน ไม่รู้อันไหนดีกว่ากัน
+                ## return redirect(url_for('admin.blacklist'))
             elif file and file.filename.endswith('.json'):
                 data = json.load(file)
+                total_rows = len(data)
                 for item in data:
                     existing_url = URL.query.filter_by(url=item['url']).first()
                     if existing_url:
                         continue
                     url = URL(url=item['url'], category=item['category'], 
-                              date_added=parse_date(item['date_added']).date(), 
-                              reason=item['reason'], source=item['source'], status=item['status'])
+                            date_added=parse_date(item['date_added']).date(), 
+                            reason=item['reason'], source=item['source'], status=item['status'])
                     db.session.add(url)
-                db.session.commit()
+                    count += 1
+                    percent = (count / total_rows) * 100
+                    if count % 100 == 0:
+                        sse.publish({"message": percent}, type='progress')
 
-                flash('JSON imported successfully', 'success')
-                return redirect(url_for('admin.blacklist'))
+                db.session.commit()
+                sse.publish({"message": "complete"}, type='progress')
+                ## ให้ฝั่ง client เรียกแทน ไม่รู้อันไหนดีกว่ากัน
+                ## return redirect(url_for('admin.blacklist'))
             else:
+                sse.publish({"message": "error: Invalid file format"}, type='progress')
                 flash('Invalid file format', 'error')
                 return redirect(url_for('admin.blacklist'))
+                
         except IntegrityError:
             db.session.rollback()
+            sse.publish({"message": "error: An error occurred while importing data"}, type='progress')
             flash('An error occurred while importing data', 'error')
             return redirect(url_for('admin.blacklist'))
+            
         except Exception as e:
+            sse.publish({"message": f"error:{str(e)}"}, type='progress')
             flash(f'An error occurred: {str(e)}', 'error')
             return redirect(url_for('admin.blacklist'))
+
     return redirect(url_for('admin.blacklist'))
 
 

@@ -21,3 +21,5 @@ phonenumbers
 PyJWT==2.8.0
 playwright
 cryptography
+Flask-CORS
+Flask-SSE
