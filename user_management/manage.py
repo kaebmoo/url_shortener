@@ -10,10 +10,11 @@ from flask import Flask, cli
 from redis import Redis
 from rq import Connection, Queue, Worker
 from rq.exceptions import NoSuchJobError   # Import the exception
-from app import create_app, db
+from app import create_app, db, socketio
 from app.models import Role, User
 from app.models.miscellaneous import EditableHTML
 from config import Config
+
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -23,7 +24,11 @@ logging.basicConfig(level=logging.DEBUG)
 config_name = os.getenv('FLASK_CONFIG') or 'default'
 logging.debug(f"Config name: {config_name}")
 
+### os.environ['GEVENT_SUPPORT'] = 'True'
+
 app = create_app(os.getenv('FLASK_CONFIG') or 'default')
+
+
 
 # manager = Manager(app)
 migrate = Migrate(app, db)
@@ -133,5 +138,7 @@ def format():
 
 if __name__ == '__main__':
     # manager.run()
+    # socketio.run(app, debug=True, port=5000)
     app.run(debug=True, port=5000)
+    
 

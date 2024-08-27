@@ -27,13 +27,12 @@ csrf = CSRFProtect()
 compress = Compress()
 rq = RQ()
 migrate = Migrate()
+socketio = SocketIO()  # Initialize SocketIO
 
 # Set up Flask-Login
 login_manager = LoginManager()
 login_manager.session_protection = 'basic'
 login_manager.login_view = 'account.login'
-
-socketio = SocketIO()  # Initialize SocketIO
 
 def create_app(config):
     app = Flask(__name__, static_url_path='/static', static_folder='static')
@@ -44,7 +43,11 @@ def create_app(config):
     app.config["REDIS_URL"] = "redis://127.0.0.1"
     app.register_blueprint(sse, url_prefix='/stream')
 
-    CORS(app)   # for suppport client cross side 
+    # Allow CORS for specific routes
+    CORS(app, resources={r"/stream/*": {"origins": "*"}})
+
+    # หากมีการใช้ header เฉพาะ (เช่น Authorization หรือ Custom Headers) คุณสามารถกำหนดได้ด้วย:
+    # CORS(app, resources={r"/stream/*": {"origins": "*"}}, supports_credentials=True)
     
     config_name = config
 
@@ -66,7 +69,8 @@ def create_app(config):
     migrate.init_app(app, db)  # อย่าลืมเรียกใช้ migrate.init_app
     
     # socketio = SocketIO(app)
-    socketio.init_app(app, async_mode='gevent')  # eventlet
+    socketio.init_app(app)
+    # socketio.init_app(app, async_mode='gevent')  # eventlet
     rq.init_app(app)
 
 

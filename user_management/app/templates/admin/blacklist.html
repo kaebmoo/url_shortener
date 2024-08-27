@@ -62,10 +62,11 @@
 
             <!-- Progress bar section -->
             <div class="ui progress" id="progress-bar" style="display: none;">
-                <div class="bar" style="width: 0%;">
-                    <div class="progress">0%</div>
+                <div class="bar">
+                  <div class="progress"></div>
                 </div>
-            </div>
+                <div class="label"></div>
+              </div>
 
             <!-- Section 2: Import and Export -->
             <div class="ui centered grid mt-4">
@@ -226,6 +227,9 @@
 
                 eventSource.addEventListener('progress', function(event) {
                     const data = JSON.parse(event.data);
+                    const label = document.querySelector('#progress-bar .label');
+                    const count = data.count;
+                    const totalRows = data.total_rows;
 
                     if (data.message === 'complete') {
                         eventSource.close();
@@ -236,6 +240,7 @@
                         alert('Error: ' + data.message);
                         progressBar.style.display = 'none';
                     } else if (!isNaN(parseInt(data.message, 10))) {
+                        label.textContent = `${count}/${totalRows} row(s)`;
                         updateProgressBar(parseInt(data.message, 10));
                     } else {
                         console.error('Invalid data:', data);

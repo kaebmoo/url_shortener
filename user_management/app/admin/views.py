@@ -196,13 +196,13 @@ def blacklist_import_data():
                     db.session.add(url)
                     count += 1
                     # คำนวณเปอร์เซ็นต์
-                    percent = (count / total_rows) * 100
+                    percent = int((count / total_rows) * 100)
                     if count % 100 == 0:
                         # time.sleep(0.2)
-                        sse.publish({"message": percent}, type='progress')
+                        sse.publish({"message": percent, "count": count, "total_rows": total_rows}, type='progress')
 
                 db.session.commit()
-                sse.publish({"message": "complete"}, type='progress')
+                sse.publish({"message": "complete", "count": count, "total_rows": total_rows}, type='progress')
                 ## ให้ฝั่ง client เรียกแทน ไม่รู้อันไหนดีกว่ากัน
                 ## return redirect(url_for('admin.blacklist'))
             elif file and file.filename.endswith('.json'):
@@ -217,12 +217,12 @@ def blacklist_import_data():
                             reason=item['reason'], source=item['source'], status=item['status'])
                     db.session.add(url)
                     count += 1
-                    percent = (count / total_rows) * 100
+                    percent = int((count / total_rows) * 100)
                     if count % 100 == 0:
-                        sse.publish({"message": percent}, type='progress')
+                        sse.publish({"message": percent, "count": count, "total_rows": total_rows}, type='progress')
 
                 db.session.commit()
-                sse.publish({"message": "complete"}, type='progress')
+                sse.publish({"message": "complete", "count": count, "total_rows": total_rows}, type='progress')
                 ## ให้ฝั่ง client เรียกแทน ไม่รู้อันไหนดีกว่ากัน
                 ## return redirect(url_for('admin.blacklist'))
             else:
