@@ -53,7 +53,8 @@
 </head>
 <body>
     <div class="ui container">
-        <h1 class="ui red header">URL Safety Warning</h1>
+        <!-- URL Safety Warning -->
+        <h1 class="ui black header">{{ heading_text_h1 }}</h1>
         
         <!-- แสดงข้อความ "Loading..." ก่อนที่ภาพจะถูกโหลด -->
         <div id="loading-message" class="ui active dimmer">
@@ -65,7 +66,8 @@
             <div class="ui red segment" id="result">
                 <div class="screenshot-container">
                     <div class="screenshot-details">
-                        <h3 class="ui red header">Warning: This URL may be dangerous!</h3>
+                        <!-- Warning: This URL may be dangerous! -->
+                        <h3 class="ui red header">{{ heading_text_h3 }}</h3>
                     </div>
                     <img id="screenshot" src="{{ screenshot_path }}" alt="Screenshot of the URL" onload="hideLoadingMessage()" onerror="handleImageError()">
                     <div class="screenshot-details">

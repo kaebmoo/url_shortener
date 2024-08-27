@@ -45,7 +45,7 @@ from config import get_settings
 from database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
 from . import crud, models, schemas, keygen
 from phishing import phishing_data
-from utils import validate_and_correct_url, validate_url, capture_screenshot
+from utils import validate_and_correct_url, capture_screenshot, remove_trailing_asterisks, has_trailing_asterisks
 
 
 @asynccontextmanager
@@ -487,30 +487,49 @@ async def capture_screen(
     return {"base_url": get_settings().base_url, "screenshot_path": screenshot_path, "url": db_url.target_url}
 
 @app.get("/preview_url")
-async def preview_url(request: Request, url: str, token: str = Header(...)):
+async def preview_url(
+    request: Request, 
+    url: str, 
+    token: str = Header(...), 
+    heading_text_h1: str = None, 
+    heading_text_h3: str = None):
+
     if token != SECRET_TOKEN:
         raise HTTPException(status_code=403, detail="Forbidden")
     
     url = validate_and_correct_url(url)
     screenshot_file_name = await capture_screenshot(url)
     screenshot_path = f"/static/screenshots/{screenshot_file_name}"
+
+    # กำหนดข้อความ default ถ้าไม่ได้ระบุ heading_text
+    heading_text_h1 = heading_text_h1 or "URL Safety Warning"
+    heading_text_h3 = heading_text_h3 or "Warning: This URL may be dangerous!"
+
     return templates.TemplateResponse("preview.html", {
         "request": request, 
         "url": url, 
         "screenshot_path": screenshot_path, 
+        "heading_text_h1": heading_text_h1,
+        "heading_text_h3": heading_text_h3,
         "app_path": get_settings().safe_host
     })
 
-async def call_preview_url_async(url: str, token: str):
+async def call_preview_url_async(url: str, token: str, heading_text_h1: str = None, heading_text_h3: str = None):
     base_url = get_settings().base_url
     preview_url = base_url + "/preview_url"
     retries = 3
     async with httpx.AsyncClient(timeout=60.0) as client:
         for _ in range(retries):
             try:
+                params = {"url": url}
+                if heading_text_h1:
+                    params["heading_text_h1"] = heading_text_h1
+                if heading_text_h3:
+                    params["heading_text_h3"] = heading_text_h3
+
                 response = await client.get(
                     preview_url,
-                    params={"url": url},
+                    params=params,
                     headers={"token": token}
                 )
                 if response.status_code == 200:
@@ -529,8 +548,19 @@ async def forward_to_target_url(
         request: Request,
         db: Session = Depends(get_db)
     ):
-    
+
+    # has asterisk at the end of url_key  
+    has_wildcard = False
+    if has_trailing_asterisks(url_key):
+        has_wildcard = True
+        url_key = remove_trailing_asterisks(url_key)
+
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
+        if has_wildcard:
+            # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
+            html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN, heading_text_h1="Link Inspector", heading_text_h3="Inspect a short link to make sure it's safe to click on.")
+            return HTMLResponse(content=html_content)
+        
         if db_url.status is not None and db_url.status.lower() == "danger":
             # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
             html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
