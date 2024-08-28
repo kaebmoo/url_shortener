@@ -50,9 +50,14 @@
         $('#shorten-url-form').on('submit', function(e) {
             e.preventDefault();
             let targetUrl = $('#target-url').val();
+            let baseUrl = window.location.origin;
+
+            if (window.location.protocol === "file:") {
+                baseUrl = "http://127.0.0.1:8000";  // ฮาร์ดโค้ด URL ของเซิร์ฟเวอร์ที่ต้องการ
+            }
 
             $.ajax({
-                url: window.location.origin + '/url/guest',
+                url: baseUrl + '/url/guest',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ target_url: targetUrl }),
