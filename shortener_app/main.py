@@ -35,6 +35,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 
 from sqlalchemy.orm import Session
@@ -59,18 +60,29 @@ async def lifespan(app: FastAPI):
 
     # Start a background task to periodically deactivate expired URLs
     cleanup_task = asyncio.create_task(deactivate_expired_urls_periodically())
+    remove_expired_task = asyncio.create_task(remove_expired_urls_periodically())
 
     yield
     # Shutdown: Any cleanup code would go here (ถ้ามี)
-    # Shutdown: Any cleanup code would go here (ถ้ามี)
-    # You might want to cancel the cleanup_task when the application shuts down
+
+    # You might want to cancel the cleanup_task, remove_expired_task when the application shuts down
     cleanup_task.cancel()
+    remove_expired_task.cancel()
     try:
         await cleanup_task
+        await remove_expired_task
     except asyncio.CancelledError:
         print("Cleanup task was cancelled")
 
 app = FastAPI(root_path="", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # อนุญาตทุก origin หรือสามารถระบุเป็น ["http://localhost:8000"]
+    allow_credentials=True,
+    allow_methods=["*"],  # อนุญาตทุก method เช่น GET, POST, OPTIONS
+    allow_headers=["*"],  # อนุญาตทุก header
+)
+
 templates = Jinja2Templates(directory="shortener_app/templates")
 
 # Mount the static files directory
@@ -100,9 +112,13 @@ async def deactivate_expired_urls_periodically():
     """Periodically deactivate expired URLs every 24 hours."""
     try:
         while True:
-            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
             db = next(get_db())
-            crud.deactivate_expired_urls(db)
+            # กำหนดระยะเวลาหมดอายุเป็น 30 นาที
+            # crud.deactivate_expired_urls(db, timedelta(minutes=30))
+            # กำหนดระยะเวลาหมดอายุเป็น 7 วัน
+            crud.deactivate_expired_urls(db, timedelta(days=7))
+            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
+
     except asyncio.CancelledError:
         print("Periodic cleanup was cancelled")
         raise  # Re-raise to allow proper shutdown handling
@@ -111,9 +127,13 @@ async def remove_expired_urls_periodically():
     """Periodically deactivate expired URLs every 24 hours."""
     try:
         while True:
-            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
             db = next(get_db())
-            crud.remove_expired_urls(db)
+            # ลบ URL ที่หมดอายุหลังจาก 30 นาที
+            # crud.remove_expired_urls(db, timedelta(minutes=30))
+            # ลบ URL ที่หมดอายุหลังจาก 30 วัน
+            crud.remove_expired_urls(db, timedelta(days=30))
+            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
+
     except asyncio.CancelledError:
         print("Periodic cleanup was cancelled")
         raise  # Re-raise to allow proper shutdown handling
@@ -167,10 +187,13 @@ def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
         secret_key=db_url.secret_key,
         qr_code=f"data:image/png;base64,{qr_code_base64}",
         title=db_url.title,
-        favicon_url=db_url.favicon_url
+        favicon_url=db_url.favicon_url,
+        created_at=db_url.created_at,
+        updated_at=db_url.updated_at 
     )
     # แปลง Pydantic model เป็น dict ก่อนส่งกลับ
-    return JSONResponse(content=response.model_dump(), status_code=200)
+    # ใช้ json.dumps() แปลง model เป็น JSON string
+    return JSONResponse(content=json.loads(response.model_dump_json()), status_code=200)
     # return db_url
     
 
@@ -429,6 +452,11 @@ async def read_about(request: Request):
     ''' about page '''
     return templates.TemplateResponse("about.html", {"request": request, "title": "About Page"})
 
+@app.get("/shorten", response_class=HTMLResponse)
+async def shorten_example(request: Request):
+    ''' shorten example page '''
+    return templates.TemplateResponse("shorten.html", {"request": request})
+
 
 @app.post("/api/register_api_key", tags=["api key"])
 def register_api_key(
@@ -597,7 +625,7 @@ async def forward_to_target_url(
 
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
         # ตรวจสอบว่าลิงก์หมดอายุแล้วหรือยัง
-        if crud.is_url_expired(db_url):
+        if crud.is_url_expired(db_url, timedelta(days=7)):
             raise HTTPException(status_code=410, detail="URL has expired")
         
         if has_wildcard:
