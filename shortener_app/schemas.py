@@ -43,6 +43,8 @@ class URLInfo(URL):
     qr_code: Optional[str] = Field(None, description="Base64 encoded QR code image for the URL")
     title: Optional[str] = None
     favicon_url: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None  # ยอมรับ None
     # This enhances URL by requiring two additional strings, url and admin_url. 
     # You could also add the two strings url and admin_url to URL. 
     # But by adding url and admin_url to the URLInfo subclass, 
@@ -60,6 +62,10 @@ class URLInfo(URL):
                 "title": "Example Page",
                 "favicon_url": "https://example.com/favicon.ico"
             }
+        }
+        
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),  # ใช้ ISO format สำหรับ datetime
         }
 
 class URLUser(BaseModel):

@@ -1,11 +1,23 @@
 # shortener_app/crud.py
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from . import keygen, models, schemas
+
+# สร้าง logger
+logger = logging.getLogger("uvicorn.error")
+
+# ตั้งค่าระดับการ log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 
 def create_db_url(db: Session, url: schemas.URLBase, api_key: str) -> models.URL:
     ''' create short url  '''
@@ -170,36 +182,40 @@ def verify_secret_and_api_key(db: Session, secret_key: str, api_key: str, api_db
     # Return True if a matching record is found in both databases, otherwise False
     return bool(db_url)
 
-def is_url_expired(db_url):
+def is_url_expired(db_url, expiry_timedelta: timedelta):
     """Check if a URL has expired based on the created_at field."""
     if db_url.api_key is None:  # Checking for guest URLs (without API key)
-        expiration_date = db_url.created_at + timedelta(days=30)
+        expiration_date = db_url.created_at + expiry_timedelta
         if datetime.now() > expiration_date:
             return True
     return False
 
-def remove_expired_urls(db: Session):
-    """ remove expired urls """
+def remove_expired_urls(db: Session, expiry_timedelta: timedelta):
+    """ Remove expired URLs based on custom expiry timedelta """
     current_time = datetime.now()  # ใช้ offset-naive datetime เพื่อให้สอดคล้องกับเวลาที่บันทึกในฐานข้อมูล
+    expired_time = current_time - expiry_timedelta
+    
     expired_urls = db.query(models.URL).filter(
         models.URL.api_key == None,  # URLs created by guest
-        models.URL.created_at < (current_time - timedelta(days=30))
+        models.URL.created_at < expired_time
     ).all()
 
     for url in expired_urls:
         db.delete(url)
+        logger.warning(f"deleting: {url.key}, {url.target_url}")
     db.commit()
 
-def deactivate_expired_urls(db: Session):
+def deactivate_expired_urls(db: Session, expiry_timedelta: timedelta):
     """Deactivate URLs that have expired by setting is_active to False."""
     current_time = datetime.now()  # ใช้ offset-naive datetime เพื่อให้สอดคล้องกับเวลาที่บันทึกในฐานข้อมูล
     expired_urls = db.query(models.URL).filter(
         models.URL.api_key == None,  # URLs created by guest
         models.URL.is_active == True,  # Only consider active URLs
-        models.URL.created_at < (current_time - timedelta(days=30))
+        models.URL.created_at < (current_time - expiry_timedelta)
     ).all()
 
     for db_url in expired_urls:
         db_url.is_active = False
         db.add(db_url)
+        logger.warning(f"deactivating: {db_url.key}, {db_url.target_url}")
     db.commit()
