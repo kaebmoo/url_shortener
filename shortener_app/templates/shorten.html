@@ -52,7 +52,7 @@
             let targetUrl = $('#target-url').val();
 
             $.ajax({
-                url: 'http://127.0.0.1:8000/url/guest',
+                url: window.location.origin + '/url/guest',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ target_url: targetUrl }),
