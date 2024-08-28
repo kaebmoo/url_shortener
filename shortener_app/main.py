@@ -1,25 +1,6 @@
 # shortener_app/main.py
 import logging
 from typing import Optional
-from fastapi.staticfiles import StaticFiles
-import requests  # Import for checking website existence
-import secrets
-import validators
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body, WebSocketDisconnect
-from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
-from fastapi.openapi.utils import get_openapi
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from contextlib import asynccontextmanager
-
-from sqlalchemy.orm import Session
-from starlette.datastructures import URL
-from fastapi.responses import JSONResponse
-from qrcodegen import QrCode
-from PIL import Image
 import io
 import base64
 from urllib.parse import urlparse, urljoin
@@ -36,8 +17,31 @@ from typing import List
 import sys
 import os
 import socket
-from ipaddress import ip_network, ip_address, IPv6Address, IPv4Address
+import requests  # Import for checking website existence
+
+from contextlib import asynccontextmanager
+import secrets
+import validators
 import httpx
+
+from fastapi.staticfiles import StaticFiles
+
+from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body, WebSocketDisconnect
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
+from fastapi.openapi.utils import get_openapi
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
+
+
+from sqlalchemy.orm import Session
+from starlette.datastructures import URL
+
+from qrcodegen import QrCode
+from PIL import Image
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -47,13 +51,24 @@ from . import crud, models, schemas, keygen
 from phishing import phishing_data
 from utils import validate_and_correct_url, capture_screenshot, remove_trailing_asterisks, has_trailing_asterisks
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ''' Startup: Fetch phishing URLs '''
     # Startup: Fetch phishing URLs
     phishing_data.fetch_phishing_urls()  # เรียกใช้งาน fetch_phishing_urls จากอินสแตนซ์ของ PhishingData
+
+    # Start a background task to periodically deactivate expired URLs
+    cleanup_task = asyncio.create_task(deactivate_expired_urls_periodically())
+
     yield
     # Shutdown: Any cleanup code would go here (ถ้ามี)
+    # Shutdown: Any cleanup code would go here (ถ้ามี)
+    # You might want to cancel the cleanup_task when the application shuts down
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        print("Cleanup task was cancelled")
 
 app = FastAPI(root_path="", lifespan=lifespan)
 templates = Jinja2Templates(directory="shortener_app/templates")
@@ -61,23 +76,11 @@ templates = Jinja2Templates(directory="shortener_app/templates")
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="shortener_app/static"), name="static")
 
-
 # กำหนด Security scheme สำหรับ X-API-KEY Header    
 api_key_header = APIKeyHeader(name="X-API-KEY")
 
 # Security scheme สำหรับ BearerAuth
 http_bearer = HTTPBearer()
-
-INTERNAL_IP_RANGES = [
-    # IPv4 private address ranges
-    ip_network("10.0.0.0/8"),
-    ip_network("172.16.0.0/12"),
-    ip_network("192.168.0.0/16"),
-    
-    # IPv6 private address ranges
-    ip_network("fc00::/7"),  # Unique Local Addresses (ULA)
-    ip_network("fe80::/10"), # Link-Local Addresses
-]
 
 SECRET_KEY = get_settings().secret_key
 ALGORITHM = "HS256"
@@ -93,7 +96,30 @@ models.BaseBlacklist.metadata.create_all(bind=engine_blacklist)
 
 logging.basicConfig(level=logging.INFO)
 
+async def deactivate_expired_urls_periodically():
+    """Periodically deactivate expired URLs every 24 hours."""
+    try:
+        while True:
+            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
+            db = next(get_db())
+            crud.deactivate_expired_urls(db)
+    except asyncio.CancelledError:
+        print("Periodic cleanup was cancelled")
+        raise  # Re-raise to allow proper shutdown handling
+
+async def remove_expired_urls_periodically():
+    """Periodically deactivate expired URLs every 24 hours."""
+    try:
+        while True:
+            await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
+            db = next(get_db())
+            crud.remove_expired_urls(db)
+    except asyncio.CancelledError:
+        print("Periodic cleanup was cancelled")
+        raise  # Re-raise to allow proper shutdown handling
+
 def get_secret_key(authorization: str = Header(...)):
+    ''' get secret key for Authorization '''
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -101,22 +127,10 @@ def get_secret_key(authorization: str = Header(...)):
         )
     return authorization[len("Bearer "):]
 
-
-def is_internal_url(url):
-    hostname = urlparse(url).hostname
-    try:
-        addr_info = socket.getaddrinfo(hostname, None)  # Resolves both IPv4 and IPv6
-        for addr in addr_info:
-            ip = ip_address(addr[4][0])
-            if any(ip in network for network in INTERNAL_IP_RANGES):
-                return True
-        return False  # If none of the IPs are in the internal ranges
-    except socket.gaierror:
-        # Handle case where the hostname cannot be resolved by treating it as internal
-        return True
     
 @app.get("/check-phishing/", tags=["url"])
 async def check_phishing(url: str, background_tasks: BackgroundTasks):
+    ''' add background tasks for update phishing urls '''
     # Schedule the feed to be updated if necessary
     if datetime.now() - phishing_data.last_update_time > timedelta(hours=12):
         background_tasks.add_task(phishing_data.update_phishing_urls)
@@ -133,6 +147,7 @@ async def check_phishing(url: str, background_tasks: BackgroundTasks):
     )
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
+    ''' get url information '''
     base_url = URL(get_settings().base_url)
     admin_endpoint = app.url_path_for(
         "administration info", secret_key=db_url.secret_key
@@ -158,22 +173,28 @@ def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
     
 
 def raise_not_found(request):
+    ''' raise exception url doesn't exit '''
     message = f"URL '{request.url}' doesn't exist"
     raise HTTPException(status_code=404, detail=message)
 
 def raise_forbidden(message):
+    ''' raise exception 403 '''
     raise HTTPException(status_code=403, detail=message)
 
 def raise_bad_request(message):
+    ''' raise exception bad request '''
     raise HTTPException(status_code=400, detail=message)
 
 def raise_already_used(message):
+    ''' raise exception already use '''
     raise HTTPException(status_code=400, detail=message)
 
 def raise_not_reachable(message):
+    ''' raise exception 504 '''
     raise HTTPException(status_code=504, detail=message)
 
 def raise_api_key(api_key: str):
+    ''' raise exception 401 '''
     message = f"API key '{api_key}' is missing or invalid"
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message)
 
@@ -200,6 +221,7 @@ def normalize_url(url: str, trailing_slash: bool = False) -> str:
 
 # ฐานข้อมูลหลัก main database
 def get_db():
+    ''' main database '''
     db = SessionLocal()
     try:
         yield db
@@ -208,6 +230,7 @@ def get_db():
 
 # ฟังก์ชันสำหรับการเชื่อมต่อกับฐานข้อมูล API keys
 def get_api_db():
+    ''' api database '''
     db = SessionAPI()
     try:
         yield db
@@ -215,6 +238,7 @@ def get_api_db():
         db.close()
 
 def get_blacklist_db():
+    ''' blacklist database '''
     db = SessionBlacklist()
     try:
         yield db
@@ -222,11 +246,13 @@ def get_blacklist_db():
         db.close()
 
 def get_optional_api_db():
+    ''' optional api database '''
     if get_settings().use_api_db:
         return next(get_api_db())
     return None
 
 def verify_jwt_token(authorization: str = Header(None)):
+    ''' verify jwt token '''
     try:
         token = authorization.split(" ")[1]
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -247,6 +273,7 @@ def verify_jwt_token(authorization: str = Header(None)):
         )
     
 def create_access_token():
+    ''' create access token '''
     now = datetime.now(timezone.utc)
     payload = {
         "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
@@ -260,6 +287,7 @@ def create_access_token():
 async def verify_api_key(
     request: Request, db: Session = Depends(get_api_db)
 ):
+    ''' verify api key '''
     api_key = request.headers.get("X-API-KEY")  # Get API key from headers
     if not api_key:
         raise_api_key(api_key) 
@@ -276,7 +304,7 @@ async def websocket_endpoint(
     secret_key: str, 
     db: Session = Depends(get_db)
 ):
-    
+    ''' provide websocket return url information '''
     await websocket.accept()
 
     try:
@@ -350,7 +378,7 @@ async def fetch_page_info(url: str):
 executor = ThreadPoolExecutor(max_workers=2)
 
 def fetch_page_info_and_update_sync(db_url: models.URL):
-    """Fetch page info and update the database synchronously."""
+    """ Fetch page info and update the database synchronously."""
     with SessionLocal() as db:
         loop = asyncio.new_event_loop()  # Create a new event loop
         asyncio.set_event_loop(loop)  # Set the new event loop as the current one
@@ -370,6 +398,7 @@ async def fetch_page_info_and_update(db_url: models.URL):
     )
 
 def generate_qr_code(data):
+    ''' generate qr code '''
     qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
     size = qr.get_size()
     scale = 5
@@ -388,51 +417,41 @@ def generate_qr_code(data):
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
 
-def is_host_active(target_url):
-    try:
-        # แยก hostname และ port จาก URL
-        parsed_url = urlparse(target_url)
-        hostname = parsed_url.hostname
-        port = parsed_url.port
-
-        # ถ้าไม่มี port ใน URL ให้กำหนดค่า default ตาม scheme
-        if port is None:
-            if parsed_url.scheme == "https":
-                port = 443
-            else:
-                port = 80
-
-        # สร้าง socket และเชื่อมต่อ
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(10)  # กำหนด timeout
-        sock.connect((hostname, port))
-        sock.close()  # ปิด socket หลังจากเชื่อมต่อสำเร็จ
-        return True
-    except (socket.timeout, socket.error):
-        return False
-
 @app.get("/")
 def read_root():
+    ''' root api '''
     return "Welcome to the URL shortener API :)"
 
 @app.get("/about", response_class=HTMLResponse)
 async def read_about(request: Request):
+    ''' about page '''
     return templates.TemplateResponse("about.html", {"request": request, "title": "About Page"})
 
 
 @app.post("/api/register_api_key", tags=["api key"])
-def register_api_key(api_key: schemas.APIKeyCreate, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
+def register_api_key(
+    api_key: schemas.APIKeyCreate, 
+    db: Session = Depends(get_api_db), 
+    _: str = Depends(verify_jwt_token)):
+
+    ''' register api key '''
     result = crud.register_api_key(db, api_key.api_key, api_key.role_id)
     return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
 
 @app.post("/api/deactivate_api_key", tags=["api key"])
-def deactivate_api_key(api_key: schemas.APIKeyDelete, db: Session = Depends(get_api_db), _: str = Depends(verify_jwt_token)):
+def deactivate_api_key(
+    api_key: schemas.APIKeyDelete, 
+    db: Session = Depends(get_api_db), 
+    _: str = Depends(verify_jwt_token)):
+
+    ''' deactivate api key '''
     result = crud.deactivate_api_key(db=db, api_key=api_key.api_key)
     return JSONResponse(content={"message": result["message"]}, status_code=result["status_code"])
 
 
 @app.post("/api/refresh_token", tags=["api key"])
 def refresh_token(refresh_token: str):
+    ''' refresh jwt token '''
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload["sub"] != "user_management":
@@ -453,6 +472,10 @@ async def capture_screen(
     url_key: str, 
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db)):
+    ''' capture screen save to file
+        args:
+            a) url key
+    '''
 
     # ค้นหา URL จากฐานข้อมูลโดยใช้ url_key
     db_url = crud.get_db_url_by_key(db=db, url_key=url_key)
@@ -493,6 +516,11 @@ async def preview_url(
     token: str = Header(...), 
     heading_text_h1: str = None, 
     heading_text_h3: str = None):
+    ''' call capture screen return preview.thml
+        args:
+            a) url
+            b) heading text h1, h3 [option]
+    '''
 
     if token != SECRET_TOKEN:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -515,8 +543,13 @@ async def preview_url(
     })
 
 async def call_preview_url_async(url: str, token: str, heading_text_h1: str = None, heading_text_h3: str = None):
+    ''' asynchonous call preview url 
+        args:
+            a) url
+            b) heading text h1, h3 [option]
+    '''
     base_url = get_settings().base_url
-    preview_url = base_url + "/preview_url"
+    preview_url_route = base_url + "/preview_url"
     retries = 3
     async with httpx.AsyncClient(timeout=60.0) as client:
         for _ in range(retries):
@@ -528,7 +561,7 @@ async def call_preview_url_async(url: str, token: str, heading_text_h1: str = No
                     params["heading_text_h3"] = heading_text_h3
 
                 response = await client.get(
-                    preview_url,
+                    preview_url_route,
                     params=params,
                     headers={"token": token}
                 )
@@ -548,6 +581,11 @@ async def forward_to_target_url(
         request: Request,
         db: Session = Depends(get_db)
     ):
+    ''' forward short url to target url
+        preview target url
+        args:
+            a) url key
+    '''
 
     # has asterisk at the end of url_key  
     has_wildcard = False
@@ -556,6 +594,10 @@ async def forward_to_target_url(
         url_key = remove_trailing_asterisks(url_key)
 
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
+        # ตรวจสอบว่าลิงก์หมดอายุแล้วหรือยัง
+        if crud.is_url_expired(db_url):
+            raise HTTPException(status_code=410, detail="URL has expired")
+        
         if has_wildcard:
             # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
             html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN, heading_text_h1="Link Inspector", heading_text_h3="Inspect a short link to make sure it's safe to click on.")
@@ -566,23 +608,10 @@ async def forward_to_target_url(
             html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
             return HTMLResponse(content=html_content)
         
-        # Check if target URL exists
-        # Check if target URL exists or is in the internal network
-        if is_internal_url(db_url.target_url):
-            # Skip the reachability check for internal URLs
-            crud.update_db_clicks(db=db, db_url=db_url)
-            return RedirectResponse(db_url.target_url)
-        else:
-            '''            
-            # the reachability check
-            if is_host_active(db_url.target_url):
-                crud.update_db_clicks(db=db, db_url=db_url)
-                return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
-            else:
-                raise_not_reachable(message=f"The target URL '{db_url.target_url}' does not seem to be reachable.")
-            '''
-            crud.update_db_clicks(db=db, db_url=db_url)
-            return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
+
+            
+        crud.update_db_clicks(db=db, db_url=db_url) # นับจำนวนการเข้า url
+        return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
             
     else:
         raise_not_found(request)
@@ -600,6 +629,11 @@ async def create_url(
     api_db: Optional[Session] = Depends(get_optional_api_db),
     blacklist_db: Session = Depends(get_blacklist_db)
 ):
+    ''' create short url
+        args:
+            a) target url
+            b) api key
+    '''
     url.target_url = normalize_url(url.target_url, trailing_slash=False)
 
     if not validators.url(url.target_url):
@@ -674,11 +708,52 @@ async def create_url(
 
     return get_admin_info(db_url)
 
+@app.post("/url/guest", response_model=schemas.URLInfo, tags=["url"])
+async def create_url_guest(
+    url: schemas.URLBase,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    blacklist_db: Session = Depends(get_blacklist_db)
+):
+    ''' create short url for guest (without API key)
+        args:
+            a) target url
+    '''
+    # Normalize and validate the target URL
+    url.target_url = normalize_url(url.target_url, trailing_slash=False)
+
+    if not validators.url(url.target_url):
+        raise_bad_request(message="Your provided URL is not valid")
+
+    # Check if the URL is blacklisted
+    if crud.is_url_in_blacklist(blacklist_db, url.target_url):
+        raise_forbidden(message="The provided URL is blacklisted and cannot be shortened.")
+
+    # Check if the URL is a phishing site
+    phishing_check_response = await check_phishing(url.target_url, background_tasks)
+    if phishing_check_response.status_code == 403:
+        raise_forbidden(message=phishing_check_response.content["message"])
+
+    # Create a new URL entry in the database for a guest user (without an API key)
+    db_url = crud.create_db_url(db=db, url=url, api_key=None)
+
+    # Add a background task to fetch title and favicon
+    background_tasks.add_task(fetch_page_info_and_update, db_url)
+
+    # Return the URL info including the admin URL for managing the short URL
+    return get_admin_info(db_url)
+
+
 @app.get("/user/info", tags=["info"])
 async def get_url_count(
     api_key: str = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    '''
+    Query the count of URLs created with the given API key
+    args:
+        a) api key
+    '''
     # Query the count of URLs created with the given API key
     url_count = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).count()
 
@@ -690,6 +765,10 @@ async def get_user_url(
     api_key: str = Depends(verify_api_key), 
     db: Session = Depends(get_db)
 ):
+    ''' Query the database to get the URLs
+        args:
+            a) api key
+    '''
     # Query the database to get the URLs
     user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).all()
     
@@ -721,6 +800,13 @@ def get_url_scan_status(
     db: Session = Depends(get_db),
     api_db: Session = Depends(get_api_db),
 ):
+    ''' get malware information, scan results
+    args:
+        a) secret key
+        b) target url
+        c) scan type: name of scan vendor ex. google [option]
+        d) api key
+    '''
     is_valid = crud.verify_secret_and_api_key(db, secret_key=secret_key, api_key=api_key, api_db=api_db)
     if not is_valid:
         raise HTTPException(
@@ -762,6 +848,11 @@ def get_url_info(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)  # Added api_key dependency
 ):
+    '''get url information 
+        args:
+            a) secret key of url
+            b) api key
+    '''
     if db_url := crud.get_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key):
         return get_admin_info(db_url)
     else:
@@ -775,6 +866,7 @@ def delete_url(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)  # Added api_key dependency
 ):
+    """delete url in database"""
     if db_url := crud.deactivate_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key):
         message = f"Successfully deleted shortened URL for '{db_url.target_url}'"
         return {"detail": message}
@@ -810,4 +902,4 @@ app.openapi = custom_openapi
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, get_settings().host, port=get_settings().port)
+    uvicorn.run(app, host=get_settings().host, port=get_settings().port)

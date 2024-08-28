@@ -1,8 +1,10 @@
 # shortener_app/models.py
 
+from datetime import datetime, timedelta
+
 from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, String, DateTime, event
 from sqlalchemy.sql import func
-from sqlalchemy import event
+from sqlalchemy.orm import relationship
 from sqlalchemy.orm import mapper
 
 from database import Base, BaseAPI, BaseBlacklist
@@ -23,6 +25,7 @@ class URL(Base):
     status = Column(String) # เก็บสถานะว่าเป็น url อันตรายหรือไม่ เช่น safe, danger, no info
     title = Column(String(255)) # title page
     favicon_url = Column(String(255)) # favicon url
+    expiry_info = relationship("URLExpiry", back_populates="url", uselist=False)
 
 class URL2Check(Base):
     __tablename__ = "urls_to_check" # สำหรับ โปรแกรม ตรวจสอบดึงข้อมูลไปอ่านเพื่อทำการ scan 
@@ -62,6 +65,18 @@ class Blacklist(BaseBlacklist):
     reason = Column(String(500), nullable=False)            # เหตุผลที่ URL ถูกบล็อค
     status = Column(Boolean, nullable=True)                 # สถานะของ URL (true/false)
     source = Column(String(500), nullable=False)            # แหล่งที่มาของ blacklist
+
+# ยังไม่จำเป็นต้องใช้ เพราะ ใน URL มี field วันที่สร้างอยู่แล้ว 
+class URLExpiry(Base):
+    ''' Short URLs for guests will expire in 30 days.'''
+    __tablename__ = "url_expiry"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, ForeignKey('urls.key'), unique=True, index=True)
+    expiry_date = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
+
+    url = relationship("URL", back_populates="expiry_info")
+
 
 # ฟังก์ชันนี้จะทำให้แน่ใจว่า updated_at ถูกอัปเดตเมื่อมีการอัปเดตแถว
 @event.listens_for(URL, 'before_update')

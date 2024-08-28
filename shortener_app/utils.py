@@ -1,11 +1,25 @@
-from urllib.parse import urlparse
-from playwright.async_api import async_playwright
-import logging 
-import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
 import os
 from pathlib import Path
 import re
+import socket
+import logging 
+
+from ipaddress import ip_network, ip_address, IPv6Address, IPv4Address
+from urllib.parse import urlparse
+from playwright.async_api import async_playwright
+import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
+
+INTERNAL_IP_RANGES = [
+    # IPv4 private address ranges
+    ip_network("10.0.0.0/8"),
+    ip_network("172.16.0.0/12"),
+    ip_network("192.168.0.0/16"),
+    
+    # IPv6 private address ranges
+    ip_network("fc00::/7"),  # Unique Local Addresses (ULA)
+    ip_network("fe80::/10"), # Link-Local Addresses
+]
 
 def has_trailing_asterisks(url_key: str) -> bool:
     """ตรวจสอบว่า url_key มีเครื่องหมาย * ต่อท้ายหรือไม่
@@ -98,3 +112,42 @@ async def capture_screenshot(url: str):
         await browser.close()
 
         return file_name  # Return only the file name, not the full path
+    
+
+def is_host_active(target_url):
+    ''' check target url is active '''
+    try:
+        # แยก hostname และ port จาก URL
+        parsed_url = urlparse(target_url)
+        hostname = parsed_url.hostname
+        port = parsed_url.port
+
+        # ถ้าไม่มี port ใน URL ให้กำหนดค่า default ตาม scheme
+        if port is None:
+            if parsed_url.scheme == "https":
+                port = 443
+            else:
+                port = 80
+
+        # สร้าง socket และเชื่อมต่อ
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)  # กำหนด timeout
+        sock.connect((hostname, port))
+        sock.close()  # ปิด socket หลังจากเชื่อมต่อสำเร็จ
+        return True
+    except (socket.timeout, socket.error):
+        return False
+
+def is_internal_url(url):
+    ''' is intranet host '''
+    hostname = urlparse(url).hostname
+    try:
+        addr_info = socket.getaddrinfo(hostname, None)  # Resolves both IPv4 and IPv6
+        for addr in addr_info:
+            ip = ip_address(addr[4][0])
+            if any(ip in network for network in INTERNAL_IP_RANGES):
+                return True
+        return False  # If none of the IPs are in the internal ranges
+    except socket.gaierror:
+        # Handle case where the hostname cannot be resolved by treating it as internal
+        return True
