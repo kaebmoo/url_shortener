@@ -157,18 +157,20 @@ def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
     qr_code_base64 = generate_qr_code(db_url.url)
     
     # ต้องดู Model ด้วย
-    response = {
-        'target_url': db_url.target_url,
-        'is_active': db_url.is_active,
-        'clicks': db_url.clicks,
-        'url': db_url.url,
-        'admin_url': db_url.admin_url,
-        'secret_key': db_url.secret_key,
-        'qr_code': f"data:image/png;base64,{qr_code_base64}",
-        'title': db_url.title,
-        'favicon_url': db_url.favicon_url
-    }
-    return JSONResponse(content=response, status_code=200)
+    # สร้าง response โดยใช้ URLInfo
+    response = schemas.URLInfo(
+        target_url=db_url.target_url,
+        is_active=db_url.is_active,
+        clicks=db_url.clicks,
+        url=db_url.url,
+        admin_url=db_url.admin_url,  # ส่งค่า admin_url ที่คำนวณไว้
+        secret_key=db_url.secret_key,
+        qr_code=f"data:image/png;base64,{qr_code_base64}",
+        title=db_url.title,
+        favicon_url=db_url.favicon_url
+    )
+    # แปลง Pydantic model เป็น dict ก่อนส่งกลับ
+    return JSONResponse(content=response.model_dump(), status_code=200)
     # return db_url
     
 
@@ -632,7 +634,7 @@ async def create_url(
     ''' create short url
         args:
             a) target url
-            b) api key
+            b) custom key (Custom key for shortening the URL. Only available for VIP users.)
     '''
     url.target_url = normalize_url(url.target_url, trailing_slash=False)
 
@@ -710,7 +712,7 @@ async def create_url(
 
 @app.post("/url/guest", response_model=schemas.URLInfo, tags=["url"])
 async def create_url_guest(
-    url: schemas.URLBase,
+    url: schemas.GuestURLBase,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     blacklist_db: Session = Depends(get_blacklist_db)
@@ -719,6 +721,9 @@ async def create_url_guest(
         args:
             a) target url
     '''
+    # บังคับให้ custom_key เป็น None เสมอสำหรับผู้ใช้ guest
+    url.custom_key = None
+
     # Normalize and validate the target URL
     url.target_url = normalize_url(url.target_url, trailing_slash=False)
 
