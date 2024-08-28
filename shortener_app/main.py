@@ -356,16 +356,21 @@ async def websocket_endpoint(
                 # Decode the JSONResponse body before accessing elements
                 url_info_dict = json.loads(url_info.body.decode("utf-8"))
 
+                # ส่งข้อมูลผ่าน WebSocket
                 await websocket.send_json(url_info_dict)  # Send the content of the JSONResponse 
 
             await asyncio.sleep(5)
+
     except WebSocketDisconnect:
         logging.warning("WebSocket disconnected")
     except Exception as e:
-        logging.error(f"Unexpected error in WebSocket connection: {e}")
+        logging.error("Unexpected error in WebSocket connection: %s", e)
     finally:
         # ถ้าออกจาก loop แสดงว่าไม่มีการอัพเดต หรือมีการอัพเดตแล้ว ให้ปิดการเชื่อมต่อ
-        await websocket.close()
+        try:
+            await websocket.close()
+        except RuntimeError as e:
+            logging.error("Error closing WebSocket: %s", e)
 
     
 async def fetch_page_info(url: str):
