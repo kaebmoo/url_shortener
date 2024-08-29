@@ -37,6 +37,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+
 
 from sqlalchemy.orm import Session
 from starlette.datastructures import URL
@@ -82,6 +87,12 @@ app.add_middleware(
     allow_methods=["*"],  # อนุญาตทุก method เช่น GET, POST, OPTIONS
     allow_headers=["*"],  # อนุญาตทุก header
 )
+
+# Initialize Limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 templates = Jinja2Templates(directory="shortener_app/templates")
 
@@ -744,7 +755,9 @@ async def create_url(
     return get_admin_info(db_url)
 
 @app.post("/url/guest", response_model=schemas.URLInfo, tags=["url"])
+@limiter.limit("30/minute")  # 30 requests per minute per IP
 async def create_url_guest(
+    request: Request,  # Include the request argument for slowapi to apply rate limiting based on the request's IP address or other properties. 
     url: schemas.GuestURLBase,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
