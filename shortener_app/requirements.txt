@@ -13,3 +13,4 @@ beautifulsoup4
 httpx
 aiohttp
 slowapi
+psycopg2
