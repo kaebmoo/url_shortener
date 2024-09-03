@@ -806,7 +806,7 @@ async def get_url_count(
         a) api key
     '''
     # Query the count of URLs created with the given API key
-    url_count = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).count()
+    url_count = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == True).count()
 
     # Return the count as a JSON response
     return JSONResponse(content={"url_count": url_count}, status_code=200)
@@ -821,7 +821,7 @@ async def get_user_url(
             a) api key
     '''
     # Query the database to get the URLs
-    user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == 1).all()
+    user_urls = db.query(models.URL).filter(models.URL.api_key == api_key, models.URL.is_active == True).all()
     
     # Convert the results to JSON serializable form
     user_urls_json = jsonable_encoder(user_urls)

@@ -17,7 +17,7 @@ class Permission:
 
 class Role(db.Model):
     __tablename__ = 'roles'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(64), unique=True)
     index = db.Column(db.String(64))
     default = db.Column(db.Boolean, default=False, index=True)
@@ -50,7 +50,7 @@ class Role(db.Model):
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     confirmed = db.Column(db.Boolean, default=False)
     first_name = db.Column(db.String(64), index=True)
     last_name = db.Column(db.String(64), index=True)

@@ -306,3 +306,16 @@ alembic -n blacklist upgrade head          # อัปเกรดฐานข�
 ```
 
 การทำตามขั้นตอนนี้จะช่วยให้คุณสามารถจัดการ migrations สำหรับแต่ละฐานข้อมูลได้อย่างแยกส่วนและเป็นระเบียบครับ
+
+```
+# ยังไม่จำเป็นต้องใช้ เพราะ ใน URL มี field วันที่สร้างอยู่แล้ว 
+class URLExpiry(Base):
+    ''' Short URLs for guests will expire in 30 days.'''
+    __tablename__ = "url_expiry"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    key = Column(String, ForeignKey('urls.key'), unique=True, index=True)
+    expiry_date = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
+
+    url = relationship("URL", back_populates="expiry_info")
+```
