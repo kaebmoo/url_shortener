@@ -24,3 +24,5 @@ cryptography
 Flask-CORS
 Flask-SSE
 psycopg2
+yapf
+isort

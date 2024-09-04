@@ -47,16 +47,15 @@ class Config:
 
     # Admin account
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'password')
-    ADMIN_EMAIL = os.environ.get(
-        'ADMIN_EMAIL', 'kaebmoo@gmail.com')
+    ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'kaebmoo@gmail.com')
     EMAIL_SUBJECT_PREFIX = '[{}]'.format(APP_NAME)
     EMAIL_SENDER = '{app_name} Admin <{email}>'.format(
-        app_name=APP_NAME, email=os.environ.get('EMAIL_SENDER')) 
-    # MAIL_USERNAME can't use 
+        app_name=APP_NAME, email=os.environ.get('EMAIL_SENDER'))
+    # MAIL_USERNAME can't use
     # use EMAIL_SENDER for sendgrid. Verify ownership of a single email address to use as a sender.
 
     # INFOBIP
-    INFOBIP = os.environ.get('INFOBIP') 
+    INFOBIP = os.environ.get('INFOBIP')
     NT_SMS_HOST = os.environ.get('NT_SMS_HOST')
     NT_SMS_API = os.environ.get('NT_SMS_API')
     NT_SMS_USER = os.environ.get('NT_SMS_USER')
@@ -64,8 +63,10 @@ class Config:
     NT_SMS_SENDER = os.environ.get('NT_SMS_SENDER')
 
     TIMEZONE = os.getenv('TIMEZONE', 'UTC')  # Default to UTC if not set
-    APP_PATH = os.getenv('APP_PATH', '/')   # กรณีกำหนด path อื่น เช่น /apps การทำ reverse proxy
-    APP_HOST = os.getenv('APP_HOST', 'http://localhost') # กำหนดเป็นชื่อ domain
+    APP_PATH = os.getenv(
+        'APP_PATH', '/')  # กรณีกำหนด path อื่น เช่น /apps การทำ reverse proxy
+    APP_HOST = os.getenv('APP_HOST',
+                         'http://localhost')  # กำหนดเป็นชื่อ domain
     SHORTENER_HOST_NAME = os.getenv('SHORTENER_HOST_NAME', 'http://localhost')
     ASSET_PATH = os.getenv('ASSET_PATH', '')
 
@@ -94,10 +95,13 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     ASSETS_DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL',
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'DEV_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-dev.sqlite'))
-    SQLALCHEMY_BINDS = { 
-        'blacklist_db': os.environ.get('DEV_BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
+    SQLALCHEMY_BINDS = {
+        'blacklist_db':
+        os.environ.get('DEV_BLACKLIST_DATABASE_URL',
+                       'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
 
     @classmethod
@@ -108,10 +112,13 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL',
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'TEST_DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'data-test.sqlite'))
-    SQLALCHEMY_BINDS = { 
-        'blacklist_db': os.environ.get('TEST_BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
+    SQLALCHEMY_BINDS = {
+        'blacklist_db':
+        os.environ.get('TEST_BLACKLIST_DATABASE_URL',
+                       'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
     WTF_CSRF_ENABLED = False
 
@@ -124,10 +131,13 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL',
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'DATABASE_URL',
         'sqlite:///' + os.path.join(basedir, 'user_management.sqlite'))
-    SQLALCHEMY_BINDS = { 
-        'blacklist_db': os.environ.get('BLACKLIST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
+    SQLALCHEMY_BINDS = {
+        'blacklist_db':
+        os.environ.get('BLACKLIST_DATABASE_URL',
+                       'sqlite:///' + os.path.join(basedir, 'blacklist.db'))
     }
     SSL_DISABLE = (os.environ.get('SSL_DISABLE', 'True') == 'True')
 
@@ -140,6 +150,7 @@ class ProductionConfig(Config):
 
 
 class HerokuConfig(ProductionConfig):
+
     @classmethod
     def init_app(cls, app):
         ProductionConfig.init_app(app)
@@ -151,6 +162,7 @@ class HerokuConfig(ProductionConfig):
 
 
 class UnixConfig(ProductionConfig):
+
     @classmethod
     def init_app(cls, app):
         ProductionConfig.init_app(app)

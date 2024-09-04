@@ -4,21 +4,20 @@ import subprocess
 import uuid
 
 # https://stackoverflow.com/questions/68527489/cant-import-migratecommand-from-flask-migrate
-from flask_migrate import Migrate # from flask_migrate import Migrate, MigrateCommand
+from flask_migrate import Migrate  # from flask_migrate import Migrate, MigrateCommand
 import click
 from flask import Flask, cli
 from redis import Redis
 from rq import Connection, Queue, Worker
-from rq.exceptions import NoSuchJobError   # Import the exception
+from rq.exceptions import NoSuchJobError  # Import the exception
 from app import create_app, db, socketio
 from app.models import Role, User
 from app.models.miscellaneous import EditableHTML
 from config import Config
 
-
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
+logging.basicConfig(level=logging.DEBUG)
 
 # Check and print the environment variable
 config_name = os.getenv('FLASK_CONFIG') or 'default'
@@ -28,14 +27,14 @@ logging.debug(f"Config name: {config_name}")
 
 app = create_app(os.getenv('FLASK_CONFIG') or 'default')
 
-
-
 # manager = Manager(app)
 migrate = Migrate(app, db)
+
 
 @app.context_processor
 def inject_asset_path():
     return dict(asset_path=app.config['ASSET_PATH'])
+
 
 @app.shell_context_processor
 def make_shell_context():
@@ -61,8 +60,11 @@ def recreate_db():
     db.create_all()
     db.session.commit()
 
+
 @app.cli.command("add-fake-data")
-@click.option('--number-users', default=10, help='Number of each model type to create')
+@click.option('--number-users',
+              default=10,
+              help='Number of each model type to create')
 def add_fake_data(number_users):
     """
     Adds fake data to the database.
@@ -93,13 +95,12 @@ def setup_general():
     if admin_query.first() is not None:
         if User.query.filter_by(email=Config.ADMIN_EMAIL).first() is None:
             uid = uuid.uuid4().hex
-            user = User(
-                first_name='Admin',
-                last_name='Account',
-                password=Config.ADMIN_PASSWORD,
-                confirmed=True,
-                email=Config.ADMIN_EMAIL,
-                uid=uid)
+            user = User(first_name='Admin',
+                        last_name='Account',
+                        password=Config.ADMIN_PASSWORD,
+                        confirmed=True,
+                        email=Config.ADMIN_EMAIL,
+                        uid=uid)
             db.session.add(user)
             db.session.commit()
             print('Added administrator {}'.format(user.full_name()))
@@ -109,18 +110,16 @@ def setup_general():
 def run_worker():
     """Initializes a slim rq task queue."""
     listen = ['default']
-    conn = Redis(
-        host=app.config['RQ_DEFAULT_HOST'],
-        port=app.config['RQ_DEFAULT_PORT'],
-        db=0,
-        password=app.config['RQ_DEFAULT_PASSWORD'])
+    conn = Redis(host=app.config['RQ_DEFAULT_HOST'],
+                 port=app.config['RQ_DEFAULT_PORT'],
+                 db=0,
+                 password=app.config['RQ_DEFAULT_PASSWORD'])
 
     with Connection(conn):
         worker = Worker(map(Queue, listen))
         worker.work()
         # สร้างคิวโดยใช้ connection ของ Redis
         queue = Queue(connection=conn)
-
 
 
 @app.cli.command()
@@ -140,5 +139,3 @@ if __name__ == '__main__':
     # manager.run()
     # socketio.run(app, debug=True, port=5000)
     app.run(debug=True, port=5000)
-    
-
