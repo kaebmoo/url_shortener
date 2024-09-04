@@ -864,7 +864,11 @@ def get_url_scan_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="Secret key or API key not found or invalid."
         )
 
+    target_url = normalize_url(target_url, trailing_slash=False)
+
     query = db.query(models.scan_records).filter(models.scan_records.url == target_url)
+    # query = db.query(models.scan_records).filter(models.scan_records.url.ilike(f"%{target_url}%"))
+
     
     if scan_type:
         query = query.filter(models.scan_records.scan_type == scan_type)
