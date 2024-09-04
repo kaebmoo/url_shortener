@@ -105,8 +105,9 @@ class RegistrationForm(FlaskForm):
     email = EmailField(
         'Email', validators=[InputRequired(),
                              Length(1, 64),
-                             Email(),
-                             validate_domain])
+                             Email()])
+    # validate_domain
+    
     # phone_number = TelField('Phone')
     password = PasswordField(
         'Password',

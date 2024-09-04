@@ -30,3 +30,5 @@ shortener_app/openapi_shorten_url.json
 shortener_app/blacklist.db
 blacklist.db
 /user_management/migrations
+tmp/blacklist_.html
+tmp/blacklist_1.html

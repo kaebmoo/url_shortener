@@ -405,7 +405,7 @@ def join_from_invite(user_id, token):
             db.session.add(new_user)
             db.session.commit()
             # send api_key, role_id to fastapi
-            register_api_key(api_key=new_user.uid, role_id=new_user.role_id)
+            register_api_key(new_user.uid, new_user.role_id)
             #
             flash('Your password has been set. After you log in, you can '
                   'go to the "Your Account" page to review your account '

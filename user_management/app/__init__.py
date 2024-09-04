@@ -69,8 +69,9 @@ def create_app(config):
     migrate.init_app(app, db)  # อย่าลืมเรียกใช้ migrate.init_app
     
     # socketio = SocketIO(app)
-    socketio.init_app(app)
+    # socketio.init_app(app)
     # socketio.init_app(app, async_mode='gevent')  # eventlet
+
     rq.init_app(app)
 
 
@@ -110,6 +111,6 @@ def create_app(config):
     app.register_blueprint(shorten_blueprint, url_prefix='/url')
 
     # Add socketio to app context
-    app.socketio = socketio
+    # app.socketio = socketio
 
     return app
