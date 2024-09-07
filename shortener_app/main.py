@@ -644,17 +644,15 @@ async def forward_to_target_url(
         if crud.is_url_expired(db_url, timedelta(days=7)):
             raise HTTPException(status_code=410, detail="URL has expired")
         
-        if has_wildcard:
-            # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
-            html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN, heading_text_h1="Link Inspector", heading_text_h3="Inspect a short link to make sure it's safe to click on.")
-            return HTMLResponse(content=html_content)
-        
         if db_url.status is not None and db_url.status.lower() == "danger":
             # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
             html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
             return HTMLResponse(content=html_content)
         
-
+        if has_wildcard:
+            # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
+            html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN, heading_text_h1="Link Inspector", heading_text_h3="Inspect a short link to make sure it's safe to click on.")
+            return HTMLResponse(content=html_content)
             
         crud.update_db_clicks(db=db, db_url=db_url) # นับจำนวนการเข้า url
         return RedirectResponse(db_url.target_url)  # ไปยัง url ปลายทาง
