@@ -182,13 +182,14 @@ def verify_secret_and_api_key(db: Session, secret_key: str, api_key: str, api_db
     # Return True if a matching record is found in both databases, otherwise False
     return bool(db_url)
 
-def is_url_expired(db_url, expiry_timedelta: timedelta):
+def is_url_expired(db_url, expiration_delta):
     """Check if a URL has expired based on the created_at field."""
     if db_url.api_key is None:  # Checking for guest URLs (without API key)
-        expiration_date = db_url.created_at + expiry_timedelta
-        if datetime.now() > expiration_date:
+        expiration_date = db_url.created_at + expiration_delta
+        # Make datetime.now() timezone-aware
+        if datetime.now(timezone.utc) > expiration_date:
             return True
-    return False
+        return False
 
 def remove_expired_urls(db: Session, expiry_timedelta: timedelta):
     """ Remove expired URLs based on custom expiry timedelta """

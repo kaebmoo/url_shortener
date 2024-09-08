@@ -57,6 +57,9 @@
                 contentType: 'application/json',
                 data: JSON.stringify({ target_url: targetUrl }),
                 success: function(response) {
+                    // Remove only the previous expiration message
+                    $('#expiry-message').empty();
+
                     $('#short-url').text(response.url).attr('href', response.url);
                     $('#result-target-url').text(response.target_url);
 
@@ -74,9 +77,12 @@
                         $('#result-favicon').attr('src', '');
                     }
 
-                    let createdAtUTC = new Date(response.created_at + 'Z'); // UTC time
-                    let expiresAtUTC = new Date(createdAtUTC);
+                    // Convert PostgreSQL timestamp to ISO format
+                    let createdAtString = response.created_at.replace(' ', 'T');
+                    let createdAtUTC = new Date(createdAtString); // This will now parse the date correctly
 
+                    let expiresAtUTC = new Date(createdAtUTC);
+                    
                     let createdAtLocal = new Date(createdAtUTC.getTime());
                     let expiresAtLocal = new Date(expiresAtUTC.getTime());
                     expiresAtLocal.setDate(expiresAtLocal.getDate() + 7);
@@ -90,7 +96,8 @@
                     $('#qr-code').attr('src', response.qr_code);
                     $('#result').show();
 
-                    $('#result').append(`
+                    // Append expiration message to the #expiry-message section
+                    $('#expiry-message').html(`
                         <p><strong>Expires In:</strong> 7 days</p>
                         <p>To prevent abuse, we automatically delete unclaimed links after 7 days. To claim this link, simply sign up for a free account.</p>
                     `);
@@ -99,6 +106,7 @@
                         copyToClipboard(response.url);
                     });
                 }
+
             });
         });
 
