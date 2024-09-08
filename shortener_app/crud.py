@@ -190,6 +190,9 @@ def is_url_expired(db_url, expiration_delta):
         if datetime.now(timezone.utc) > expiration_date:
             return True
         return False
+    else:
+        # URLs with an API key are not considered expired based on time limits
+        return False  # or some other logic based on your requirement
 
 def remove_expired_urls(db: Session, expiry_timedelta: timedelta):
     """ Remove expired URLs based on custom expiry timedelta """
