@@ -1,3 +1,4 @@
+import datetime
 from flask import (
     Flask, Blueprint, abort, flash, redirect, render_template, request, 
     url_for, jsonify, send_file, make_response, current_app, Response, stream_with_context
@@ -470,3 +471,18 @@ def update_editor_contents():
     db.session.commit()
 
     return 'OK', 200
+
+@admin.route('/delete-unconfirmed-users', methods=['POST'])
+@login_required
+@admin_required
+def delete_unconfirmed_users():
+    # Define the threshold (e.g., users unconfirmed for more than 7 days)
+    threshold_date = datetime.utcnow() - datetime.timedelta(days=7)
+    unconfirmed_users = User.query.filter(
+        User.confirmed == False,
+        User.created_at < threshold_date
+    ).all()
+    
+    for user in unconfirmed_users:
+        db.session.delete(user)
+    db.session.commit()

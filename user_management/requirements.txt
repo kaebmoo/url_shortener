@@ -26,3 +26,5 @@ Flask-SSE
 psycopg2
 yapf
 isort
+pyotp
+qrcode[pil]

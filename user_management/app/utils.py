@@ -1,16 +1,27 @@
+import os
+from dateutil import parser
+import pytz
+from io import BytesIO
+import base64
+from PIL import Image, ImageDraw
+from urllib.parse import urlparse
+from playwright.async_api import async_playwright
+import logging 
+import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
+
+import asyncio
+from datetime import datetime
+
+from qrcodegen import QrCode
+
 from flask import url_for, current_app
 from wtforms.fields import Field
 from wtforms.widgets import HiddenInput
 import sys
 import random
 
-import base64
-from PIL import Image
-from qrcodegen import QrCode
-from io import BytesIO
 
-from datetime import datetime
-import pytz
 
 # from wtforms.compat import text_type
 if sys.version_info[0] >= 3:
@@ -61,6 +72,66 @@ def generate_otp():
     return random.randint(1000, 9999)
 
 def generate_qr_code(data):
+    qr = QrCode.encode_text(data, QrCode.Ecc.QUARTILE)
+    size = qr.get_size()
+    scale = 8
+    img_size = size * scale
+    img = Image.new('1', (img_size, img_size), 'white')
+
+    # วาด QR Code ลงในภาพ
+    for y in range(size):
+        for x in range(size):
+            if qr.get_module(x, y):
+                for dy in range(scale):
+                    for dx in range(scale):
+                        img.putpixel((x * scale + dx, y * scale + dy), 0)
+
+    # ระบุ path ของโลโก้ใน Flask app
+    logo_path = os.path.join(current_app.root_path, 'static', '01_NT-Logo.png')
+    logo = Image.open(logo_path)
+
+    # รักษาอัตราส่วนของโลโก้
+    logo_width, logo_height = logo.size
+    logo_ratio = logo_width / logo_height
+    max_logo_size = img_size // 5  # ขยายพื้นที่ตรงกลางให้ใหญ่ขึ้น
+
+    if logo_width > logo_height:
+        new_logo_width = max_logo_size
+        new_logo_height = int(max_logo_size / logo_ratio)
+    else:
+        new_logo_height = max_logo_size
+        new_logo_width = int(max_logo_size * logo_ratio)
+
+    logo = logo.resize((new_logo_width, new_logo_height))
+
+    # ขยายพื้นที่รอบโลโก้ (ขยายพื้นที่ตรงกลางของ QR Code)
+    padding = 10  # ขยายขนาด padding รอบโลโก้
+    logo_position = (
+        (img_size - new_logo_width - padding) // 2,
+        (img_size - new_logo_height - padding) // 2
+    )
+
+    draw = ImageDraw.Draw(img)
+    draw.rectangle(
+        [
+            (logo_position[0] - padding, logo_position[1] - padding),
+            (logo_position[0] + new_logo_width + padding, logo_position[1] + new_logo_height + padding)
+        ],
+        fill="white"
+    )
+
+    # วางโลโก้ตรงกลาง QR Code
+    img = img.convert("RGB")
+    img.paste(logo, logo_position, mask=logo)
+
+    # แปลงภาพเป็น Base64
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+
+    return img_str
+
+def generate_qr_code_(data):
     qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
     size = qr.get_size()
     scale = 5
@@ -84,22 +155,23 @@ def convert_to_localtime(utc_timestamp):
         return ''  # or return a default value like an empty string or a specific date
     try:
         timezone_str = current_app.config.get('TIMEZONE', 'Asia/Bangkok')
-        utc_time = datetime.strptime(utc_timestamp, '%Y-%m-%dT%H:%M:%S')
-        utc_time = utc_time.replace(tzinfo=pytz.utc)
+        # utc_time = datetime.strptime(utc_timestamp, '%Y-%m-%dT%H:%M:%S')
+
+        # ใช้ dateutil.parser.parse เพื่อแปลง timestamp
+        utc_time = parser.parse(utc_timestamp)
+
+        # utc_time = utc_time.replace(tzinfo=pytz.utc)
+        # local_timezone = pytz.timezone(timezone_str)
+        # local_time = utc_time.astimezone(local_timezone)
+
+        # แปลงเป็นเวลาท้องถิ่น
         local_timezone = pytz.timezone(timezone_str)
         local_time = utc_time.astimezone(local_timezone)
+
         return local_time.strftime('%Y-%m-%d %H:%M:%S')
     except Exception as e:
         print(f"Error converting time: {e}")
         return utc_timestamp  # return the original timestamp if there's an error
-    
-from urllib.parse import urlparse
-from playwright.async_api import async_playwright
-import logging 
-import asyncio
-import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
-import os
 
 def validate_and_correct_url(url: str) -> str:
     if not urlparse(url).scheme:

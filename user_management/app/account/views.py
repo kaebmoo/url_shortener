@@ -1,3 +1,5 @@
+""" User management: register new user, password, email, phone, register confirm """
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for, session, current_app
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -13,9 +15,12 @@ from app.account.forms import (
 )
 from app.email import send_email
 from app.models import User
-from app.utils import generate_otp
+# from app.utils import generate_otp
 from app.sms import send_otp
 from app.apicall import register_api_key, create_jwt_token, create_refresh_token
+
+# Import OTPService
+from app.otp_service import OTPService
 
 from werkzeug.security import check_password_hash, generate_password_hash
 import uuid
@@ -26,18 +31,18 @@ from redis import Redis
 
 account = Blueprint('account', __name__)
 
-
 # Create a Redis connection (adjust the parameters accordingly) RQ_DEFAULT_HOST RQ_DEFAULT_PORT
 redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
 
 # Create a queue using the Redis connection
 queue = Queue(connection=redis_connection)
-
+# Configure the connection to the queue (e.g., Redis)
+## queue = Queue(connection='redis://localhost:6379')  # Replace with your actual connection details
 
 # get_queue() is deprecated use queue instead.
 
-# Configure the connection to the queue (e.g., Redis)
-## queue = Queue(connection='redis://localhost:6379')  # Replace with your actual connection details
+# Create an instance of OTPService
+otp_service = OTPService()
 
 @account.route('/login', methods=['GET', 'POST'])
 def login():
@@ -100,28 +105,44 @@ def register_email():
             template='account/email/confirm',
             user=user,
             confirm_link=confirm_link)
-        flash('A confirmation link has been sent to {}.'.format(user.email),
-              'warning')
+        flash(f'A confirmation link has been sent to {user.email}.', 'warning')
         return redirect(url_for('main.index'))
     return render_template('account/register.html', form=form)
 
 @account.route('/register_phone', methods=['GET', 'POST'])
 def register_phone():
+    """Register a new user by phone, and send them a confirmation OTP."""
     form = PhoneNumberForm()
     if form.validate_on_submit():
-        otp = generate_otp()
-        queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp)
-        # send_otp(phone_number, otp)
-        
-        session['otp'] = otp
-        session['first_name'] = form.first_name.data
-        session['last_name'] = form.last_name.data
+        # add user here
+        # Generate a unique user ID
+        uid = uuid.uuid4().hex
+
+        # Create the user with 'confirmed=False'
+        user = User(
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            phone_number=form.phone_number.data,
+            email=uid,  # Placeholder email if not using email
+            uid=uid,
+            password=form.password.data,  # Ensure password hashing is handled in the model
+            confirmed=False
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        # otp = generate_otp()
+        # Generate OTP using OTPService
+        otp = otp_service.generate_otp(form.phone_number.data, expiration=90)
+        queue.enqueue(send_otp, phone_number=form.phone_number.data, otp=otp) # send_otp(phone_number, otp)
+
+        # Store the phone number in session to identify the user in the next step
         session['phone_number'] = form.phone_number.data
-        session['password'] = form.password.data  # You should hash the password
-        
+
+        flash('An OTP has been sent to your phone number. Please enter it to confirm your account.', 'warning')
+
         return redirect(url_for('account.verify_otp'))
     return render_template('account/register_phone.html', form=form)
-
 
 
 @account.route('/logout')
@@ -172,8 +193,7 @@ def reset_password_request():
                 user=user,
                 reset_link=reset_link,
                 next=request.args.get('next'))
-        flash('A password reset link has been sent to {}.'.format(
-            form.email.data), 'warning')
+        flash(f'A password reset link has been sent to {form.email.data}.', 'warning')
         return redirect(url_for('account.login'))
     return render_template('account/reset_password.html', form=form)
 
@@ -254,23 +274,26 @@ def change_email_request():
 @account.route('/manage/change-phone', methods=['GET', 'POST'])
 @login_required
 def change_phone_request():
-    """Respond to existing user's request to change their email."""
+    """Respond to existing user's request to change their phone number."""
     form = ChangePhoneForm()
     if form.validate_on_submit():
         if current_user.verify_password(form.password.data):
             session['user_id'] = current_user.id
             new_phone = form.phone_number.data
-            session['phone_number'] = new_phone
+            session['new_phone_number'] = new_phone
+
             # send otp to confirm new phone number
-            otp = generate_otp()
+            # otp = generate_otp()
+            # Generate OTP using OTPService
+            otp = otp_service.generate_otp(new_phone, expiration=90)
+
             session['otp'] = otp
             queue.enqueue(send_otp, phone_number=new_phone, otp=otp)
             
-            flash('A confirmation otp has been sent to {}.'.format(new_phone),
-                  'warning')
-            return redirect(url_for('account.confirm_otp'))
+            flash(f'A confirmation OTP has been sent to {new_phone}.','warning')
+            return redirect(url_for('account.confirm_phone_change'))
         else:
-            flash('Invalid email or password.', 'form-error')
+            flash('Invalid password.', 'form-error')
     return render_template('account/manage.html', form=form, is_email=False)
 
 @account.route('/manage/change-email/<token>', methods=['GET', 'POST'])
@@ -302,6 +325,26 @@ def confirm_request():
         current_user.email), 'warning')
     return redirect(url_for('main.index'))
 
+@account.route('/confirm-otp')
+@login_required
+def otp_request():
+    """Respond to new user's request for a new OTP."""
+    phone_number = session.get('phone_number')
+
+    if not phone_number:
+        flash('Session expired. Please start the registration process again.', 'error')
+        return redirect(url_for('account.register_phone'))
+    
+    # Generate new OTP using OTPService
+    otp = otp_service.generate_otp(phone_number, expiration=90)
+
+    # Enqueue sending the OTP via SMS
+    queue.enqueue(send_otp, phone_number=phone_number, otp=otp)
+
+    flash(f'A new otp has been sent to {phone_number}.', 'warning')
+    
+    return redirect(url_for('account.verify_otp'))
+
 
 @account.route('/confirm-account/<token>')
 @login_required
@@ -317,66 +360,87 @@ def confirm(token):
         flash('The confirmation link is invalid or has expired.', 'error')
     return redirect(url_for('main.index'))
 
-# for confirm when user change phone number
-@account.route('/confirm_phone', methods=['GET', 'POST'])
-def confirm_otp():
+@account.route('/confirm_phone_change', methods=['GET', 'POST'])
+def confirm_phone_change():
+    """Respond to existing user's request to change their phone number."""
     form = OTPForm()
+    
+    new_phone_number = session.get('new_phone_number')
+    # ใช้ otp_service เพื่อดึงเวลาที่เหลือสำหรับ OTP นี้
+    time_remaining = int(otp_service.get_time_remaining(new_phone_number))
+    
     if form.validate_on_submit():
         entered_otp = form.otp.data
-        if entered_otp == str(session.get('otp')):
-            user_id = session.get('user_id')
-            phone_number = session.get('phone_number')
-            
-            user = db.session.query(User).filter_by(id=user_id).first()
-            current_user.phone_number = phone_number
 
-            db.session.add(user)
+        if not new_phone_number:
+            flash('Session expired. Please try changing your phone number again.', 'error')
+            return redirect(url_for('account.change_phone_request'))
+        
+        # Use OTPService to confirm the OTP
+        if otp_service.confirm_otp(new_phone_number, entered_otp):
+            # OTP is valid; update the user's phone number
+            current_user.phone_number = new_phone_number
             db.session.commit()
-            # login_user(user)
             
-            session.pop('otp', None)
-            session.pop('phone_number', None)
-            flash('Your phone number has been successfully verified and changed.', 'success')
-            return redirect(url_for('account.manage'))  # Adjust to your dashboard route
+            # Clean up session data
+            session.pop('new_phone_number', None)
+            
+            flash('Your phone number has been successfully updated.', 'success')
+            return redirect(url_for('account.manage'))
         else:
-            flash('Invalid OTP.', 'error')
-    return render_template('account/verify_otp.html', form=form)
+            flash('Invalid or expired OTP. Please try again.', 'error')
+    return render_template('account/verify_otp.html', form=form, time_remaining=time_remaining)
 
 # for register user by phone
 @account.route('/verify_otp', methods=['GET', 'POST'])
 def verify_otp():
+    """Confirm new user's account (register by phone) with provided otp."""
     form = OTPForm()
+    # ดึงหมายเลขโทรศัพท์จาก session หรือจากผู้ใช้
+    phone_number = session.get('phone_number')
+
+    # ใช้ otp_service เพื่อดึงเวลาที่เหลือสำหรับ OTP นี้
+    time_remaining = int(otp_service.get_time_remaining(phone_number))
+    
+    if time_remaining <= 0:
+        flash('Your OTP has expired. Please request a new OTP.', 'warning')
+        return redirect(url_for('account.otp_request'))
+    
     if form.validate_on_submit():
         entered_otp = form.otp.data
-        if entered_otp == str(session.get('otp')):
-            first_name = session.get('first_name')
-            last_name = session.get('last_name')
-            phone_number = session.get('phone_number')
-            password = session.get('password')
-            uid = uuid.uuid4().hex
-            session['uid'] = uid
-            user = User(
-                first_name=first_name,
-                last_name=last_name,
-                email=uid, # Assuming email is not used for phone registration
-                uid = uid,
-                phone_number=phone_number, 
-                password=password, 
-                confirmed=True)  # You should hash the password
-            db.session.add(user)
+
+        if not phone_number:
+            flash('Session expired. Please start the registration process again.', 'error')
+            return redirect(url_for('account.register_phone'))
+        
+        # Use OTPService to confirm the OTP
+        if otp_service.confirm_otp(phone_number, entered_otp):
+            # OTP is valid; retrieve the user from the database
+            user = User.query.filter_by(phone_number=phone_number).first()
+            if user is None:
+                flash('User not found. Please register again.', 'error')
+                return redirect(url_for('account.register_phone'))
+            
+            # Activate the user's account
+            user.confirmed = True
             db.session.commit()
+            
+            # Log in the user
             login_user(user)
-            session.pop('otp', None)
+
+            # Clean up session data
             session.pop('phone_number', None)
-            session.pop('password', None)
-            flash('Phone number verified and registered successfully!', 'success')
-            # send uid as api_key to fastapi here. phone register confirmed.
-            register_api_key(uid, 1)
+            flash('Your phone number has been verified and your account is activated.', 'success')
+
+            # Send API key or perform any additional setup
+            register_api_key(user.uid, user.role_id)
 
             return redirect(url_for('main.index'))  # Adjust to your dashboard route
         else:
-            flash('Invalid OTP.', 'error')
-    return render_template('account/verify_otp.html', form=form)
+            flash('Invalid or Expired OTP.', 'error')
+            # if invalid ask user -> need to regen otp?
+            
+    return render_template('account/verify_otp.html', form=form, time_remaining=time_remaining)
 
 
 @account.route(
@@ -431,14 +495,49 @@ def join_from_invite(user_id, token):
     return redirect(url_for('main.index'))
 
 
-@account.before_app_request
+'''@account.before_app_request
 def before_request():
     """Force user to confirm email before accessing login-required routes."""
     if current_user.is_authenticated \
             and not current_user.confirmed \
             and request.endpoint[:8] != 'account.' \
             and request.endpoint != 'static':
-        return redirect(url_for('account.unconfirmed'))
+        return redirect(url_for('account.unconfirmed'))'''
+    
+@account.before_app_request
+def before_request():
+    """Force user to confirm phone number or email before accessing login-required routes."""
+    if current_user.is_authenticated:
+        # Check if user is confirmed
+        if not current_user.confirmed:
+            if request.endpoint is not None \
+                    and request.endpoint[:8] != 'account.' \
+                    and request.endpoint != 'static':
+
+                # ตรวจสอบว่าผู้ใช้ลงทะเบียนด้วยอีเมลหรือหมายเลขโทรศัพท์
+                if current_user.email and current_user.email != current_user.uid:
+                    # ผู้ใช้ลงทะเบียนด้วยอีเมล ให้รีไดเร็กไปยังหน้า unconfirmed
+                    flash('Please confirm your account with the link sent to your email.', 'warning')
+                    return redirect(url_for('account.unconfirmed'))
+
+                # ผู้ใช้ลงทะเบียนด้วยหมายเลขโทรศัพท์
+                phone_number = session.get('phone_number')
+                if phone_number:
+                    # ใช้ OTPService เพื่อคำนวณเวลาที่เหลือของ OTP
+                    time_remaining = otp_service.get_time_remaining(phone_number)
+                    if time_remaining is None or time_remaining <= 0:
+                        # ถ้า OTP หมดอายุ ให้รีไดเร็กไปขอ OTP ใหม่
+                        flash('Your OTP has expired. A new OTP has been generated and sent.', 'warning')
+                        return redirect(url_for('account.otp_request'))
+
+                    # ถ้า OTP ยังไม่หมดอายุ ให้ผู้ใช้ยืนยัน OTP
+                    flash(f'Please confirm your account with the OTP sent to your phone. Time remaining: {int(time_remaining)} seconds.', 'warning')
+                    return redirect(url_for('account.verify_otp'))
+
+                # ถ้าไม่มี phone_number ใน session ให้เริ่มต้นกระบวนการลงทะเบียนใหม่
+                flash('Session expired. Please start the registration process again.', 'error')
+                return redirect(url_for('account.register_phone'))
+
 
 
 @account.route('/unconfirmed')
@@ -447,3 +546,5 @@ def unconfirmed():
     if current_user.is_anonymous or current_user.confirmed:
         return redirect(url_for('main.index'))
     return render_template('account/unconfirmed.html')
+
+

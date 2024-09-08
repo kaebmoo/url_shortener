@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, session, url_for, flash, request, jsonify, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_wtf.csrf import CSRFError
 from flask_login import current_user, login_required
 import requests
@@ -142,7 +142,7 @@ def user():
 
     if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
         url_secret_key = request.form['url_secret_key']
-        api_key = session.get('uid')
+        api_key = current_user.uid
         target_url = request.form['target_url']
 
         if 'submit_info' in request.form:
@@ -172,7 +172,7 @@ def user():
             headers = {
                 'accept': 'application/json',
                 'Content-Type': 'application/json',
-                'X-API-KEY': session.get('uid')
+                'X-API-KEY': current_user.uid
             }
             response = requests.delete(f'{shortener_host}/admin/{url_action_form.url_secret_key.data}', headers=headers)
             if response.status_code == 200:
@@ -212,7 +212,7 @@ def vip():
 
     if url_action_form.validate_on_submit() and 'url_secret_key' in request.form:
         url_secret_key = request.form['url_secret_key']
-        api_key = session.get('uid')
+        api_key = current_user.uid
         target_url = request.form['target_url']
 
         # print("Request form data:", request.form)
@@ -245,7 +245,7 @@ def vip():
             headers = {
                 'accept': 'application/json',
                 'Content-Type': 'application/json',
-                'X-API-KEY': session.get('uid')
+                'X-API-KEY': current_user.uid
             }
             response = requests.delete(f'{shortener_host}/admin/{url_action_form.url_secret_key.data}', headers=headers)
             if response.status_code == 200:

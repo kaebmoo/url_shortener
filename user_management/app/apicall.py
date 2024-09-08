@@ -2,6 +2,7 @@
 # call fastapi 
 
 from flask import current_app, session
+from flask_login import current_user
 
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -123,7 +124,7 @@ def get_user_urls():
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')
+        'X-API-KEY': current_user.uid
     }
 
     try:

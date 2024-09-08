@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, session, url_for, flash, request, current_app, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, jsonify
 from flask_login import login_required, current_user
 from app.url.forms import URLShortenForm
 import requests
@@ -9,7 +9,7 @@ import io
 import base64
 
 from app.models import EditableHTML
-
+from app.utils import generate_qr_code
 
 shorten = Blueprint('shorten', __name__)
 
@@ -19,25 +19,6 @@ def handle_csrf_error(e):
     return render_template('errors/400.html'), 400
     # return render_template('errors/403.html', reason=e.description), 400
 
-def generate_qr_code(data):
-    qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
-    size = qr.get_size()
-    scale = 5
-    img_size = size * scale
-    img = Image.new('1', (img_size, img_size), 'white')
-
-    for y in range(size):
-        for x in range(size):
-            if qr.get_module(x, y):
-                for dy in range(scale):
-                    for dx in range(scale):
-                        img.putpixel((x * scale + dx, y * scale + dy), 0)
-
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return img_str
-
 def get_user_url_count():
     app_path = current_app.config['APP_PATH']
     app_host_name = current_app.config['APP_HOST']
@@ -46,7 +27,7 @@ def get_user_url_count():
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone น่าจะแก้ไขแล้ว
+        'X-API-KEY': current_user.uid  # ใส่ API key ของคุณ ยกเลิกการใช้การอ่านจาก session 
     }
 
     try:
@@ -81,7 +62,7 @@ def delete_url(secret_key):
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')  # Assuming you are passing the API key in the session
+        'X-API-KEY': current_user.uid  # Assuming you are passing the API key in the session
     }
     try:
         response = requests.delete(f'{shortener_host}/admin/{secret_key}', headers=headers)
@@ -105,7 +86,7 @@ def get_url_info(secret_key):
     headers = {
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'X-API-KEY': session.get('uid')  # Assuming you are passing the API key in the session
+        'X-API-KEY': current_user.uid  # Assuming you are passing the API key in the session
     }
     try:
         response = requests.get(f'{shortener_host}/admin/{secret_key}', headers=headers)
@@ -136,7 +117,7 @@ def shorten_url():
     url_count_message_th = f"คุณได้สร้าง URL แล้วทั้งหมด {url_count} รายการ"
     url_count_message_en = f"You have created a total of {url_count} URLs"
     
-    api_key = session.get('uid')
+    api_key = current_user.uid
 
     form = URLShortenForm()
     if form.validate_on_submit():
@@ -146,7 +127,7 @@ def shorten_url():
         headers = {
             'accept': 'application/json',
             'Content-Type': 'application/json',
-            'X-API-KEY': session.get('uid')  # ใส่ API key ของคุณ มี bug จากการอ่าน session กรณีลงทะเบียนด้วย phone
+            'X-API-KEY': current_user.uid   # ใส่ API key ของคุณ 
         }
 
         # Check URL count for the user

@@ -105,11 +105,11 @@ api_key_header = APIKeyHeader(name="X-API-KEY")
 # Security scheme สำหรับ BearerAuth
 http_bearer = HTTPBearer()
 
-SECRET_KEY = get_settings().secret_key
+SECRET_KEY = get_settings().secret_key  # for jwt token
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 30
-SECRET_TOKEN = SECRET_KEY
+SECRET_TOKEN = SECRET_KEY   # for preview url
 
 RESERVED_KEYS = {"apps", "docs", "redoc", "openapi", "about", "api", "url", "user", "admin", "login", "register"}
 

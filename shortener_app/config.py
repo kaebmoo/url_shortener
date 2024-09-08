@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     db_blacklist: str = os.getenv('DB_BLACKLIST', 'sqlite:///./blacklist.db')
     model_config = SettingsConfigDict(env_file=".env")
     host: str = os.getenv('HOST', '127.0.0.1')
-    port: int = os.getenv('PORT', 8000)
+    port: int = os.getenv('PORT', '8000')
     use_api_db: bool = True  # กำหนดค่าเริ่มต้นให้ใช้ api_db ถ้าไม่ต้องการให้ตั้งเป็น False
     safe_host: str = os.getenv('SAFE_HOST', 'about:blank')
 

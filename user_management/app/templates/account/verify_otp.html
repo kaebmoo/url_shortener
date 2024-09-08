@@ -6,6 +6,7 @@
     <div class="ui grid container">
         <div class="eight wide computer sixteen wide mobile centered column">
             <h2 class="ui dividing header">Enter OTP</h2>
+            <p>You have <span id="time">{{ time_remaining }}</span> seconds to confirm the OTP sent via SMS to the registered phone number.</p>
             {% set flashes = {
                 'error':   get_flashed_messages(category_filter=['form-error']),
                 'warning': get_flashed_messages(category_filter=['form-check-email']),
@@ -26,5 +27,23 @@
 
         </div>
     </div>
+    <script>
+        // เริ่มต้นเวลาจากฝั่งเซิร์ฟเวอร์
+        var timeLeft = "{{ time_remaining }}";
+        var timerElement = document.getElementById('time');
 
+        // นับถอยหลัง
+        var countdown = setInterval(function() {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timerElement.textContent = "0";
+                alert('The OTP has expired. Please request a new OTP.');
+                // พาผู้ใช้กลับไปยังหน้าก่อนหน้า
+                history.back();  
+            }
+        }, 1000);
+    </script>
 {% endblock %}
