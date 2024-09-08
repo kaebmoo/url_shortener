@@ -1,33 +1,30 @@
-import os
-from dateutil import parser
-import pytz
-from io import BytesIO
-import base64
-from PIL import Image, ImageDraw
-from urllib.parse import urlparse
-from playwright.async_api import async_playwright
-import logging 
-import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
-
 import asyncio
+import base64
+import logging
+import os
+import random
+import sys
 from datetime import datetime
+from io import BytesIO
+from urllib.parse import urlparse
 
+import aiohttp
+import pytz
+from aiohttp.client_exceptions import ClientConnectorError
+from dateutil import parser
+from flask import current_app, url_for
+from PIL import Image, ImageDraw
+from playwright.async_api import async_playwright
 from qrcodegen import QrCode
-
-from flask import url_for, current_app
 from wtforms.fields import Field
 from wtforms.widgets import HiddenInput
-import sys
-import random
-
-
 
 # from wtforms.compat import text_type
 if sys.version_info[0] >= 3:
     text_type = str
-    string_types = (str,)
+    string_types = (str, )
     izip = zip
+
 
 def register_template_utils(app):
     """Register Jinja 2 helpers (called from __init__.py)."""
@@ -51,8 +48,13 @@ def index_for_role(role):
 class CustomSelectField(Field):
     widget = HiddenInput()
 
-    def __init__(self, label='', validators=None, multiple=False,
-                 choices=[], allow_custom=True, **kwargs):
+    def __init__(self,
+                 label='',
+                 validators=None,
+                 multiple=False,
+                 choices=[],
+                 allow_custom=True,
+                 **kwargs):
         super(CustomSelectField, self).__init__(label, validators, **kwargs)
         self.multiple = multiple
         self.choices = choices
@@ -68,8 +70,10 @@ class CustomSelectField(Field):
         else:
             self.data = ''
 
+
 def generate_otp():
     return random.randint(1000, 9999)
+
 
 def generate_qr_code(data):
     qr = QrCode.encode_text(data, QrCode.Ecc.QUARTILE)
@@ -106,19 +110,14 @@ def generate_qr_code(data):
 
     # ขยายพื้นที่รอบโลโก้ (ขยายพื้นที่ตรงกลางของ QR Code)
     padding = 10  # ขยายขนาด padding รอบโลโก้
-    logo_position = (
-        (img_size - new_logo_width - padding) // 2,
-        (img_size - new_logo_height - padding) // 2
-    )
+    logo_position = ((img_size - new_logo_width - padding) // 2,
+                     (img_size - new_logo_height - padding) // 2)
 
     draw = ImageDraw.Draw(img)
-    draw.rectangle(
-        [
-            (logo_position[0] - padding, logo_position[1] - padding),
-            (logo_position[0] + new_logo_width + padding, logo_position[1] + new_logo_height + padding)
-        ],
-        fill="white"
-    )
+    draw.rectangle([(logo_position[0] - padding, logo_position[1] - padding),
+                    (logo_position[0] + new_logo_width + padding,
+                     logo_position[1] + new_logo_height + padding)],
+                   fill="white")
 
     # วางโลโก้ตรงกลาง QR Code
     img = img.convert("RGB")
@@ -130,6 +129,7 @@ def generate_qr_code(data):
     img_str = base64.b64encode(buffered.getvalue()).decode()
 
     return img_str
+
 
 def generate_qr_code_(data):
     qr = QrCode.encode_text(data, QrCode.Ecc.MEDIUM)
@@ -149,6 +149,7 @@ def generate_qr_code_(data):
     img.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
+
 
 def convert_to_localtime(utc_timestamp):
     if utc_timestamp is None:
@@ -173,11 +174,13 @@ def convert_to_localtime(utc_timestamp):
         print(f"Error converting time: {e}")
         return utc_timestamp  # return the original timestamp if there's an error
 
+
 def validate_and_correct_url(url: str) -> str:
     if not urlparse(url).scheme:
         # ถ้าไม่มี schema เพิ่ม "http://"
         url = f"http://{url}"
     return url
+
 
 def validate_url(url):
     parsed_url = urlparse(url)
@@ -194,20 +197,22 @@ async def fetch_content_type(url):
     except ClientConnectorError as e:
         print(f"Connection error: {e}")
         return None
-        
+
+
 async def capture_screenshot(url: str):
     '''content_type = await fetch_content_type(url)
     if 'text/html' not in content_type:
         print(f"URL is not an HTML page, content type: {content_type}")
         return None
-    '''    
+    '''
     async with async_playwright() as playwright:
         parsed_url = urlparse(url)
         # Replace '/' with '_' to create a valid file name
         file_name = f"{parsed_url.netloc}{parsed_url.path.replace('/', '_')}.png"
         # Save the screenshot in the 'static' folder
         # output_path = f"user_management/app/static/screenshots/{file_name}"
-        output_path = os.path.join(current_app.root_path, "static", "screenshots", file_name)
+        output_path = os.path.join(current_app.root_path, "static",
+                                   "screenshots", file_name)
 
         # chromium = playwright.chromium
         # browser = await chromium.launch(headless=True)
@@ -218,13 +223,18 @@ async def capture_screenshot(url: str):
 
         # สร้าง context ใหม่พร้อมกำหนด User-Agent
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.4472.124 Safari/537.36",
-            viewport={'width': 1280, 'height': 720}
-        )
+            user_agent=
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.4472.124 Safari/537.36",
+            viewport={
+                'width': 1280,
+                'height': 720
+            })
         page = await context.new_page()
 
         try:
-            response = await page.goto(url, timeout=30000, wait_until="networkidle") # , wait_until="domcontentloaded" "networkidle"
+            response = await page.goto(
+                url, timeout=30000, wait_until="networkidle"
+            )  # , wait_until="domcontentloaded" "networkidle"
             status = response.status
             destination_url = response.url
         except Exception as e:
@@ -232,7 +242,6 @@ async def capture_screenshot(url: str):
             logging.error(f"Error: {e}")
             return None
 
-        
         await page.screenshot(path=output_path, full_page=False)
         await browser.close()
 
