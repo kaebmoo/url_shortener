@@ -1,61 +1,59 @@
 # shortener_app/main.py
-import logging
-from typing import Optional
-import io
-import base64
-from urllib.parse import urlparse, urljoin
-import jwt
-from datetime import datetime, timedelta, timezone
 import asyncio
-import aiohttp
-from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
-import time 
+import base64
+import io
 import json
-from typing import List
-import sys
+import logging
 import os
-import socket
-import requests  # Import for checking website existence
-
-from contextlib import asynccontextmanager
 import secrets
-import validators
+import socket
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from functools import partial
+from typing import List, Optional
+from urllib.parse import urljoin, urlparse
+
+import aiohttp
 import httpx
-
-from fastapi.staticfiles import StaticFiles
-
-from fastapi import Depends, FastAPI, HTTPException, Request, status, Security, Header, BackgroundTasks, WebSocket, Body, WebSocketDisconnect
-from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+import requests  # Import for checking website existence
+import validators
+from bs4 import BeautifulSoup
+from fastapi import (BackgroundTasks, Body, Depends, FastAPI, Header,
+                     HTTPException, Request, Security, WebSocket,
+                     WebSocketDisconnect, status)
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import APIKey, APIKeyIn, SecurityScheme
 from fastapi.openapi.utils import get_openapi
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.security import (APIKeyHeader, HTTPAuthorizationCredentials,
+                              HTTPBearer)
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-
+from PIL import Image
+from qrcodegen import QrCode
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
-
-
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from starlette.datastructures import URL
-
-from qrcodegen import QrCode
-from PIL import Image
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import get_settings
-from database import SessionLocal, SessionAPI, SessionBlacklist, engine, engine_api, engine_blacklist
-from . import crud, models, schemas, keygen
+from database import (SessionAPI, SessionBlacklist, SessionLocal, engine,
+                      engine_api, engine_blacklist)
 from phishing import phishing_data
-from utils import validate_and_correct_url, capture_screenshot, remove_trailing_asterisks, has_trailing_asterisks
+from utils import (capture_screenshot, has_trailing_asterisks,
+                   remove_trailing_asterisks, validate_and_correct_url)
+
+from . import crud, keygen, models, schemas
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
