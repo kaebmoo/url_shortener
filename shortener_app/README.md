@@ -63,7 +63,7 @@ The `main.py` file serves as the core of your URL shortening API, housing essent
 *   **`/preview_url`:** Displays a preview of the target URL, including title and favicon.
 *   **`/{url_key}`:** Redirects users from shortened URLs to their original targets, handling potential errors gracefully.
 *   **`/url`:** Creates new shortened URLs, optionally with custom keys (for authorized users), and initiates background tasks to fetch page information.
-*   **`/user/info`:** Provides user-specific information like the count of shortened URLs.
+*   **`/user/url_count`:** Provides user-specific information like the count of shortened URLs.
 *   **`/user/urls`:** Retrieves a list of shortened URLs created by a specific user.
 *   **`/user/url/status`:** Updates the status of a specific URL owned by the user.
 *   **`/admin/{secret_key}`:** Fetches detailed information and management options for a shortened URL based on its secret key.
@@ -195,10 +195,10 @@ location / {
    -d '{"target_url": "https://example.com", "custom_key": "custom-key"}'
    ```
 
-### 9. **GET /user/info**
+### 9. **GET /user/url_count**
    **Request:**
    ```bash
-   curl -X GET "https://kaebmoo.com/user/info" \
+   curl -X GET "https://kaebmoo.com/user/url_count" \
    -H "X-API-KEY: YOUR_API_KEY"
    ```
 

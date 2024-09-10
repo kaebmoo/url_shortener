@@ -791,7 +791,7 @@ async def create_url_guest(
     return get_admin_info(db_url)
 
 
-@app.get("/user/info", tags=["info"])
+@app.get("/user/url_count", tags=["info"])
 async def get_url_count(
     api_key: str = Depends(verify_api_key),
     db: Session = Depends(get_db)

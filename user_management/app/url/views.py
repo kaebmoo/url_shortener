@@ -32,7 +32,7 @@ def get_user_url_count():
 
     try:
         
-        response = requests.get(shortener_host + '/user/info', headers=headers)
+        response = requests.get(shortener_host + '/user/url_count', headers=headers)
         data = response.json()
         if response.status_code == 200:
             url_count = data.get('url_count', 0)
@@ -132,7 +132,7 @@ def shorten_url():
 
         # Check URL count for the user
         try:
-            response = requests.get(shortener_host + '/user/info', headers=headers)
+            response = requests.get(shortener_host + '/user/url_count', headers=headers)
             info = response.json()
             if response.status_code == 200:
                 url_count = info.get('url_count', 0)
