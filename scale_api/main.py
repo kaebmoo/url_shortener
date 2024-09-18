@@ -1,21 +1,20 @@
 import asyncio
-from contextlib import asynccontextmanager
-
-from datetime import datetime, timezone
-from dotenv import load_dotenv
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
 import uvicorn
-
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncConnection, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import make_transient
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, update, select
-
 from redis import asyncio as aioredis
+from sqlalchemy import (Boolean, Column, DateTime, Integer, String, select,
+                        update)
+from sqlalchemy.ext.asyncio import (AsyncConnection, AsyncSession,
+                                    async_sessionmaker, create_async_engine)
+from sqlalchemy.orm import declarative_base, make_transient
 
 logging.basicConfig(level=logging.INFO)
 
@@ -105,6 +104,10 @@ class URL(Base):
     favicon_url = Column(String(255))
 
 class PostgresListener:
+    """
+    https://github.com/TCatshoek/fastapi-postgres-sse
+    https://tom.catshoek.dev/posts/postgres-sse/
+    """
     def __init__(self, conn: AsyncConnection):
         self.conn = conn
         self.listen_task = None
