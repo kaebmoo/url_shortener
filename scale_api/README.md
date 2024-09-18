@@ -1,69 +1,73 @@
-This program is a web application developed with FastAPI, using PostgreSQL and Redis to manage shortened URLs. It utilizes asynchronous programming to enhance performance and data handling. Here's how it works:
+### English Explanation:
 
-### 1. Connection Setup
-- **PostgreSQL:** Uses SQLAlchemy with `asyncpg` as an asynchronous database engine to connect to PostgreSQL, where it stores URL data.
-- **Redis:** Uses `aioredis` to connect to Redis asynchronously, acting as a cache for URL data.
+This code defines a FastAPI application that provides functionality for creating, retrieving, and redirecting shortened URLs. It utilizes an asynchronous PostgreSQL database for storing URL information and Redis for caching and quick lookups.
 
-### 2. Data Model (`URL`)
-- Creates a `URL` model using SQLAlchemy to store shortened URL information in PostgreSQL. It includes fields such as `key`, `target_url`, `is_active`, `clicks`, and others to store necessary details about each URL.
+#### Key Components:
 
-### 3. Main Functions and Operations
-- **`sync_to_redis(url: URL)`**: Synchronizes URL data from PostgreSQL to Redis by storing the URL data as JSON in Redis.
-- **`get_db()`**: Creates an asynchronous connection to PostgreSQL to be used in request handlers.
-- **`update_db(key: str)`**: Updates the URL information in PostgreSQL, such as increasing the click count and updating the `updated_at` timestamp.
-- **`get_url(key: str, background_tasks: BackgroundTasks)`**: Retrieves URL data by the given key.
-  - Checks Redis for the data first. If found, it updates the click count and timestamp in Redis and schedules an update in PostgreSQL as a background task.
-  - If not found in Redis, it retrieves the data from PostgreSQL and synchronizes it to Redis.
-- **`create_url(url: dict, background_tasks: BackgroundTasks)`**: Creates a new URL and stores it in PostgreSQL.
-  - After saving to PostgreSQL, if the URL is active, it synchronizes the data to Redis as a background task.
+1. **Environment Loading and Configuration**: 
+   - The environment variables are loaded using `dotenv`, which includes the database connection URL and API key for authentication.
 
-### 4. Initialization Functions
-- **`create_tables()`**: Creates database tables in PostgreSQL based on the `URL` model definition.
-- **`startup_sync()`**: Synchronizes all active URL data from PostgreSQL to Redis during application startup. Before syncing, it deletes existing URL keys from Redis.
+2. **Database Setup**:
+   - The SQLAlchemy ORM is used to define the `URL` model, which includes fields such as `key`, `secret_key`, `target_url`, `clicks`, and timestamps.
+   - An asynchronous PostgreSQL engine is created for interacting with the database.
+   - Redis is used for caching URL data to speed up retrieval.
 
-### 5. Application Workflow
-- **The Application:** Sets up a FastAPI app with a lifecycle (`lifespan`) to perform `create_tables()` and `startup_sync()` at startup.
-- **Running the Server:** Uses `uvicorn` to run the application on `localhost` at port 9000.
+3. **PostgreSQL Notification Listener**:
+   - A `PostgresListener` class is defined to listen for changes in the PostgreSQL database.
+   - It uses the `url_change_handler` to handle notifications from PostgreSQL, adding the payload to a queue for processing.
+   - The `process_notification` function processes these notifications, syncing data to Redis.
 
-### How the Application Works
-1. **Creating a New URL:** Accepts URL data from the user, saves it to PostgreSQL, and synchronizes it to Redis if the URL is active.
-2. **Retrieving URL Data:** When a user requests URL data using a `key`, the app first attempts to fetch the data from Redis to improve speed. If not found, it retrieves the data from PostgreSQL and synchronizes it to Redis.
-3. **Data Synchronization:** During startup, the app synchronizes all active URLs from PostgreSQL to Redis to reduce direct database calls.
+4. **FastAPI Lifespan Management**:
+   - The `lifespan` function runs on startup to sync data from PostgreSQL to Redis and start listening for database changes.
+   - It also manages shutting down tasks cleanly when the application stops.
 
-### Key Features
-- **High Performance:** Uses Redis to cache URL data, reducing the need to directly access PostgreSQL on every request.
-- **Asynchronous Operations:** Enhances the efficiency of handling requests and processing data.
-- **Automatic Synchronization:** URL data is automatically synchronized between PostgreSQL and Redis both at startup and when URLs are created or updated.
+5. **API Endpoints**:
+   - `/url/{key}`: Retrieves URL data by `key`. It first checks Redis and then falls back to the database if the data is not found in Redis.
+   - `/url`: Creates a new shortened URL, storing it in PostgreSQL and syncing it to Redis if active. Protected by an API key.
+   - `/` + `{key}`: Redirects to the target URL by the `key`, incrementing the click count and updating timestamps in both Redis and the database.
 
-This program manages shortened URLs by storing them in PostgreSQL and using Redis as a cache to enhance performance. It reduces the load on the main database and handles URL access efficiently through automatic data synchronization.
+6. **Background Tasks and Syncing**:
+   - The `sync_to_redis` function syncs URL data from PostgreSQL to Redis.
+   - The `update_db` function updates the click count and timestamp in PostgreSQL asynchronously.
 
-โปรแกรมนี้เป็นเว็บแอปพลิเคชันที่พัฒนาด้วย FastAPI และใช้ฐานข้อมูล PostgreSQL และ Redis เพื่อจัดการข้อมูลของ URL ที่ถูกย่อ (shortened URLs) โดยมีการใช้การทำงานแบบอะซิงโครนัส (asynchronous) เพื่อเพิ่มประสิทธิภาพในการประมวลผลและการจัดการข้อมูล มีการทำงานดังนี้:
+7. **Security**:
+   - The `create_url` endpoint is protected by an API key to restrict access.
 
-### 1. การตั้งค่าการเชื่อมต่อ
-- **PostgreSQL:** ใช้ SQLAlchemy และ `asyncpg` เป็น asynchronous database engine เพื่อเชื่อมต่อกับฐานข้อมูล PostgreSQL ซึ่งเก็บข้อมูล URL ต่างๆ
-- **Redis:** ใช้ `aioredis` เป็นไลบรารีสำหรับการเชื่อมต่อกับ Redis แบบอะซิงโครนัสเพื่อใช้เป็น cache สำหรับการเก็บข้อมูล URL
+### Thai Explanation:
 
-### 2. โมเดลข้อมูล (`URL`)
-- สร้างโมเดล `URL` ด้วย SQLAlchemy เพื่อเก็บข้อมูล URL ที่ย่อแล้วในฐานข้อมูล PostgreSQL มีฟิลด์ต่าง ๆ เช่น `key`, `target_url`, `is_active`, `clicks` และอื่น ๆ เพื่อเก็บข้อมูลที่จำเป็นของ URL แต่ละรายการ
+โค้ดนี้กำหนดแอปพลิเคชัน FastAPI ที่ให้ฟังก์ชันในการสร้าง ดึงข้อมูล และเปลี่ยนเส้นทาง URL ที่ถูกย่อ ส่วนนี้ใช้ฐานข้อมูล PostgreSQL แบบอะซิงโครนัสสำหรับการเก็บข้อมูล URL และ Redis สำหรับการแคชและการดึงข้อมูลที่รวดเร็ว
 
-### 3. ฟังก์ชันและการทำงานหลัก
-- **`sync_to_redis(url: URL)`**: ซิงค์ข้อมูลจาก PostgreSQL ไปยัง Redis โดยเก็บข้อมูลของ URL เป็น JSON และบันทึกใน Redis
-- **`get_db()`**: สร้างการเชื่อมต่อแบบอะซิงโครนัสกับฐานข้อมูล PostgreSQL สำหรับการใช้งานในแต่ละคำขอ (request)
-- **`update_db(key: str)`**: อัพเดตข้อมูล URL ใน PostgreSQL เช่นการเพิ่มจำนวนครั้งของการคลิกและการปรับปรุง `updated_at`
-- **`get_url(key: str, background_tasks: BackgroundTasks)`**: ดึงข้อมูล URL ตาม key ที่กำหนด
-  - ค้นหาข้อมูลใน Redis ก่อน หากพบจะอัพเดตจำนวนคลิกและเวลาใน Redis และเพิ่มงานให้อัพเดตข้อมูลใน PostgreSQL ในเบื้องหลัง
-  - หากไม่พบใน Redis จะดึงข้อมูลจาก PostgreSQL และซิงค์ข้อมูลไปยัง Redis
-- **`create_url(url: dict, background_tasks: BackgroundTasks)`**: สร้าง URL ใหม่และบันทึกลง PostgreSQL
-  - หลังจากบันทึกลง PostgreSQL แล้ว หาก URL เป็น `active` จะซิงค์ไปยัง Redis ในเบื้องหลัง
+#### ส่วนประกอบหลัก:
 
-### 4. ฟังก์ชันเริ่มต้น
-- **`create_tables()`**: สร้างตารางในฐานข้อมูล PostgreSQL ตามโมเดล `URL` ที่กำหนด
-- **`startup_sync()`**: ซิงค์ข้อมูล URL ที่ `is_active` เป็น `True` ทั้งหมดจาก PostgreSQL ไปยัง Redis ระหว่างการเริ่มต้นแอปพลิเคชัน โดยก่อนการซิงค์จะลบ keys ที่เกี่ยวข้องกับ URL ออกจาก Redis
+1. **การโหลดและกำหนดค่าของสิ่งแวดล้อม**: 
+   - ใช้ `dotenv` เพื่อโหลดตัวแปรสภาพแวดล้อม รวมถึง URL ของการเชื่อมต่อฐานข้อมูลและ API key สำหรับการยืนยันตัวตน
 
-### 5. การทำงานของแอปพลิเคชัน
-- **แอปพลิเคชัน**: สร้างแอป FastAPI ที่มี lifecycle (`lifespan`) เพื่อทำงาน `create_tables()` และ `startup_sync()` เมื่อเริ่มต้นแอป
-- **รันเซิร์ฟเวอร์**: ใช้ `uvicorn` เพื่อรันแอปพลิเคชันบน `localhost` พอร์ต 9000
+2. **การตั้งค่าฐานข้อมูล**:
+   - ใช้ SQLAlchemy ORM เพื่อกำหนดโมเดล `URL` ซึ่งประกอบด้วยฟิลด์ต่าง ๆ เช่น `key`, `secret_key`, `target_url`, `clicks` และ timestamps
+   - สร้าง PostgreSQL engine แบบอะซิงโครนัสเพื่อใช้งานกับฐานข้อมูล
+   - ใช้ Redis สำหรับแคชข้อมูล URL เพื่อเพิ่มความเร็วในการดึงข้อมูล
 
+3. **PostgreSQL Notification Listener**:
+   - คลาส `PostgresListener` ถูกกำหนดให้ฟังการเปลี่ยนแปลงในฐานข้อมูล PostgreSQL
+   - ใช้ `url_change_handler` เพื่อจัดการการแจ้งเตือนจาก PostgreSQL และเพิ่มข้อมูลใน queue สำหรับการประมวลผล
+   - ฟังก์ชัน `process_notification` ประมวลผลการแจ้งเตือนเหล่านี้และซิงค์ข้อมูลกับ Redis
+
+4. **การจัดการอายุการใช้งานของ FastAPI**:
+   - ฟังก์ชัน `lifespan` ทำงานเมื่อเริ่มต้นโปรแกรมเพื่อซิงค์ข้อมูลจาก PostgreSQL ไปยัง Redis และเริ่มฟังการเปลี่ยนแปลงของฐานข้อมูล
+   - จัดการการหยุดทำงานของ task อย่างสะอาดเมื่อแอปพลิเคชันหยุดทำงาน
+
+5. **API Endpoints**:
+   - `/url/{key}`: ดึงข้อมูล URL โดย `key` โดยตรวจสอบใน Redis ก่อนและถ้าไม่พบข้อมูลจะดึงจากฐานข้อมูล
+   - `/url`: สร้าง URL ที่ถูกย่อใหม่ เก็บไว้ใน PostgreSQL และซิงค์ไปยัง Redis ถ้าเป็น active ป้องกันด้วย API key
+   - `/` + `{key}`: เปลี่ยนเส้นทางไปยัง target URL โดยใช้ `key` เพิ่มจำนวนคลิกและอัปเดต timestamp ในทั้ง Redis และฐานข้อมูล
+
+6. **Background Tasks และ Syncing**:
+   - ฟังก์ชัน `sync_to_redis` ซิงค์ข้อมูล URL จาก PostgreSQL ไปยัง Redis
+   - ฟังก์ชัน `update_db` อัปเดตจำนวนคลิกและ timestamp ใน PostgreSQL แบบอะซิงโครนัส
+
+7. **ความปลอดภัย**:
+   - Endpoint `/url` ถูกป้องกันด้วย API key เพื่อจำกัดการเข้าถึง
+   
 ### การทำงานของแอปพลิเคชัน
 1. **การสร้าง URL ใหม่**: รับข้อมูล URL จากผู้ใช้และบันทึกใน PostgreSQL จากนั้นซิงค์ข้อมูลไปยัง Redis ถ้า URL เป็น active
 2. **การดึงข้อมูล URL**: เมื่อผู้ใช้ขอข้อมูล URL โดยใช้ `key` แอปจะพยายามดึงข้อมูลจาก Redis ก่อนเพื่อเพิ่มความเร็ว หากไม่พบข้อมูลจะดึงจาก PostgreSQL แล้วซิงค์ข้อมูลไปยัง Redis
