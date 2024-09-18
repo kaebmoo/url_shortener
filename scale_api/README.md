@@ -75,3 +75,10 @@ This program manages shortened URLs by storing them in PostgreSQL and using Redi
 - **การซิงค์ข้อมูลอัตโนมัติ**: ข้อมูล URL จะถูกซิงค์ระหว่าง PostgreSQL และ Redis อย่างอัตโนมัติทั้งในช่วงเริ่มต้นและเมื่อมีการสร้างหรืออัพเดต URL ใหม่
 
 โปรแกรมนี้มีความสามารถในการจัดการ URL ที่ย่อแล้วด้วยการเก็บข้อมูลใน PostgreSQL และใช้ Redis เป็น cache เพื่อเพิ่มประสิทธิภาพในการดึงข้อมูล, ลดภาระของฐานข้อมูลหลัก, และจัดการการเข้าถึง URL อย่างมีประสิทธิภาพ
+
+```
+curl -X POST "http://localhost:9000/url" \
+-H "x-api-key: your-secure-api-key" \
+-H "Content-Type: application/json" \
+-d '{"key": "example-key", "target_url": "https://example.com"}'
+```

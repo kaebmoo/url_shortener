@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Header, status
 from fastapi.responses import RedirectResponse
 from redis import asyncio as aioredis
 from sqlalchemy import (Boolean, Column, DateTime, Integer, String, select,
@@ -22,7 +22,8 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), 'config.env'))
 
 # Async PostgreSQL connection
-SQLALCHEMY_DATABASE_URL = os.getenv('SQLALCHEMY_DATABASE_URL', 'sqlite:///./shortener.db')
+SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL", "sqlite:///./shortener.db")
+API_KEY = os.getenv("API_KEY", "your-secure-api-key" )
 engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
@@ -238,7 +239,6 @@ async def sync_to_redis(url: URL):
     }
     await redis.set(f"url:{url.key}", json.dumps(url_data))
 
-
 # FastAPI app with lifespan
 app = FastAPI(lifespan=lifespan)
 
@@ -271,6 +271,14 @@ async def update_db(key: str):
         )
         await session.execute(stmt)
         await session.commit()
+
+async def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Invalid API key"
+        )
+    
 
 # Route to redirect to the target URL by key
 @app.get("/{key}")
@@ -351,7 +359,12 @@ async def get_url(key: str):
 
 # Route to create new URL
 @app.post("/url")
-async def create_url(url: dict, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def create_url(
+    url: dict, 
+    background_tasks: BackgroundTasks, 
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(verify_api_key)  # Add the API key dependency here
+):
     """
     Create a new URL record in PostgreSQL and sync it to Redis if it's active.
 
