@@ -118,7 +118,7 @@ class PostgresListener:
 
     async def start_listen_task(self):
         async def listen_task(conn: AsyncConnection) -> None:
-            async for notify in conn.connection.notifies():
+            async for notify in conn.driver_connection.notifies():
                 # This is where notifications would normally be handled, 
                 # but we use the add_listener method instead.
                 pass
@@ -227,9 +227,9 @@ async def sync_to_redis(url: URL):
         "target_url": url.target_url,
         "is_active": url.is_active,
         "clicks": url.clicks,
-        # Use the date strings directly from the payload
-        "created_at": url.created_at if url.created_at else None,
-        "updated_at": url.updated_at if url.updated_at else None,
+        # Handle both datetime objects and strings
+        "created_at": url.created_at if isinstance(url.created_at, str) else url.created_at.isoformat() if url.created_at else None,
+        "updated_at": url.updated_at if isinstance(url.updated_at, str) else url.updated_at.isoformat() if url.updated_at else None,
         "api_key": url.api_key,
         "is_checked": url.is_checked,
         "status": url.status,
@@ -237,6 +237,7 @@ async def sync_to_redis(url: URL):
         "favicon_url": url.favicon_url
     }
     await redis.set(f"url:{url.key}", json.dumps(url_data))
+
 
 # FastAPI app with lifespan
 app = FastAPI(lifespan=lifespan)
