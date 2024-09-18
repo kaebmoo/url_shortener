@@ -38,6 +38,9 @@ _postgres_listener = None
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifespan."""
 
+    # Run the startup sync to load data into Redis from PostgreSQL
+    await startup_sync()
+
     # Get the Postgres listener and start listening
     postgres_listener = await get_postgres_listener()
     
@@ -347,13 +350,14 @@ async def get_url(key: str):
 
 # Route to create new URL
 @app.post("/url")
-async def create_url(url: dict, background_tasks: BackgroundTasks):
+async def create_url(url: dict, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Create a new URL record in PostgreSQL and sync it to Redis if it's active.
 
     Args:
         url (dict): A dictionary containing the URL data to create.
         background_tasks (BackgroundTasks): FastAPI background tasks to run asynchronously.
+        db (AsyncSession): The database session provided by the get_db dependency.
 
     Returns:
         dict: A dictionary with a success message and the key of the created URL.
@@ -362,18 +366,16 @@ async def create_url(url: dict, background_tasks: BackgroundTasks):
     url["created_at"] = current_time
     url["updated_at"] = current_time
     
-    async with AsyncSessionLocal() as session:
-        db_url = URL(**url)
-        session.add(db_url)
-        await session.commit()
-        await session.refresh(db_url)
+    db_url = URL(**url)
+    db.add(db_url)
+    await db.commit()
+    await db.refresh(db_url)
     
     # Sync to Redis in the background if the URL is active
     if db_url.is_active:
         background_tasks.add_task(sync_to_redis, db_url)
     
     return {"message": "URL created successfully", "key": db_url.key}
-
 
 # Function to create tables
 async def create_tables():
