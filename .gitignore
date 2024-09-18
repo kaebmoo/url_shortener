@@ -32,3 +32,6 @@ blacklist.db
 /user_management/migrations
 tmp/blacklist_.html
 tmp/blacklist_1.html
+scale_api/celery_app.py
+scale_api/main_celery.py
+scale_api/tasks.py
