@@ -14,6 +14,7 @@ from sqlalchemy import (Boolean, Column, DateTime, Integer, String, select,
                         update)
 from sqlalchemy.ext.asyncio import (AsyncConnection, AsyncSession,
                                     async_sessionmaker, create_async_engine)
+from sqlalchemy_serializer import SerializerMixin
 from sqlalchemy.orm import declarative_base, make_transient
 
 logging.basicConfig(level=logging.INFO)
@@ -72,7 +73,7 @@ async def lifespan(app: FastAPI):
 
 
 # SQLAlchemy model
-class URL(Base):
+class URL(Base, SerializerMixin):
     """
     SQLAlchemy model for storing URL information.
 
@@ -348,13 +349,24 @@ async def get_url(key: str):
             if db_url:
                 # Sync to Redis
                 await sync_to_redis(db_url)
-                return {
-                    "id": db_url.id,
-                    "key": db_url.key,
-                    "target_url": db_url.target_url,
-                    "clicks": db_url.clicks,
-                    "updated_at": db_url.updated_at.isoformat()
-                }
+                # Convert db_url to a dictionary
+                return db_url.to_dict()  # Using SerializerMixin's to_dict method
+                # return {
+                #    "id": db_url.id,
+                #    "key": db_url.key,
+                #    "secret_key": db_url.secret_key,
+                #    "target_url": db_url.target_url,
+                #    "is_active": db_url.is_active,
+                #    "clicks": db_url.clicks,
+                #    # Handle both datetime objects and strings
+                #    "created_at": db_url.created_at if isinstance(db_url.created_at, str) else db_url.created_at.isoformat() if db_url.created_at else None,
+                #    "updated_at": db_url.updated_at if isinstance(db_url.updated_at, str) else db_url.updated_at.isoformat() if db_url.updated_at else None,
+                #    "api_key": db_url.api_key,
+                #    "is_checked": db_url.is_checked,
+                #    "status": db_url.status,
+                #    "title": db_url.title,
+                #    "favicon_url": db_url.favicon_url
+                #}
     raise HTTPException(status_code=404, detail="URL not found")
 
 # Route to create new URL

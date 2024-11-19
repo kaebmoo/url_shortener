@@ -2,6 +2,8 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
+from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
+from itsdangerous import BadSignature, SignatureExpired
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -118,6 +120,31 @@ def is_url_in_blacklist(db: Session, url: str) -> bool:
     """Checks if a URL is in the blacklist."""
     return db.query(models.Blacklist).filter(models.Blacklist.url == url).first() is not None
 
+def create_verification_token(user, expiration=604800):
+    """Generate a confirmation token to a new user. - open api"""
+    """ กูสร้างมาทำไมวะ จำไม่ได้ ha ha ha หยุดทำไปสามเดือนเอง """
+
+    s = Serializer('SECRET_KEY')
+    token = s.dumps({'confirm': user})
+    s.loads(token, max_age=expiration)
+    return token
+
+def verify_user_token(user, token):
+    """Verify that the provided token is for this user's. - open api"""
+    """ กูสร้างมาทำไมวะ จำไม่ได้ ha ha ha หยุดทำไปสามเดือนเอง """
+
+    s = Serializer('SECRET_KEY')
+    try:
+        data = s.loads(token)
+    except (BadSignature, SignatureExpired):
+        return False
+    if data.get('confirm') != user:
+        return False
+    # confirmed = True
+    # db.session.add(self)
+    # db.session.commit()
+    return True
+
 def register_api_key(db: Session, api_key: str, role_id: int):
     existing_api_key = get_api_key(db, api_key)
     
@@ -144,7 +171,6 @@ def deactivate_api_key(db: Session, api_key: str):
         return {"message": "API key deleted", "status_code": 200}
     else:
         return {"message": "API key not found", "status_code": 404}
-
 
     
 def is_url_info_updated(db: Session, secret_key: str, api_key: str) -> bool:
