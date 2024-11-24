@@ -35,3 +35,15 @@ tmp/blacklist_1.html
 scale_api/celery_app.py
 scale_api/main_celery.py
 scale_api/tasks.py
+db/api_key_202411241335.sql
+db/kaebmoo-apikey.db
+db/kaebmoo-shortener.db
+db/urls_202411240754.sql
+db/urls_202411240759.csv
+db/urls_202411240813.sql
+db/urls_202411240824.csv
+user_management/docs/users_202411231156.sql
+user_management/docs/users_202411231158.sql
+user_management/docs/roles_202411231203.sql
+db/users_202411231156.sql
+db/users_202411231158.sql
