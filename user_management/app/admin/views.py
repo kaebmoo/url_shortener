@@ -62,10 +62,20 @@ def index():
 def blacklist():
     page = request.args.get('page', 1, type=int)
     per_page = 50
-    urls = URL.query.paginate(page=page, per_page=per_page)
+    highlight = request.args.get('highlight')
+    highlight = int(highlight) if highlight and highlight.isdigit() else None
+    
+    # เปลี่ยนการเรียงลำดับเป็นตามวันที่อย่างเดียว
+    db.session.expire_all()
+    # urls = URL.query.order_by(URL.date_added.desc()).paginate(page=page, per_page=per_page)
+    urls = URL.query.order_by(URL.date_added.desc(), URL.id.asc()).paginate(page=page, per_page=per_page)
+
+    # print(str(URL.query.order_by(URL.date_added.desc()).statement))
+
+    
     form = AddURLForm()
     import_form = ImportForm()
-    return render_template('admin/blacklist.html', urls=urls, form=form, import_form=import_form)
+    return render_template('admin/blacklist.html', urls=urls, form=form, import_form=import_form, highlight=highlight)
 
 @admin.route('/blacklist/add', methods=['POST'])
 @login_required
@@ -116,8 +126,12 @@ def blacklist_toggle_status(id):
     url.status = not url.status
     db.session.commit()
 
+    # รับเฉพาะค่า page
+    page = request.args.get('page', 1, type=int)
+    
     flash('Status updated successfully', 'success')
-    return redirect(url_for('admin.blacklist'))
+    # ส่งเฉพาะ page และ highlight กลับไป
+    return redirect(url_for('admin.blacklist', page=page, highlight=id))
 
 @admin.route('/blacklist/search', methods=['GET'])
 @login_required

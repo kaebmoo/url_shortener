@@ -122,7 +122,7 @@
                 <table class="ui searchable sortable unstackable selectable celled table">
                     <thead>
                         <tr>
-                            <th class="sorted ascending">URL</th>
+                            <th>URL</th>
                             <th>Category</th>
                             <th>Date Added</th>
                             <th>Reason</th>
@@ -133,7 +133,8 @@
                     </thead>
                     <tbody>
                     {% for url in urls.items %}
-                        <tr>
+                        <tr id="row-{{ url.id }}" class="{% if url.id == highlight %}highlight{% endif %} {% if not url.status %}inactive{% endif %}">
+
                             <td>{{ url.url }}</td>
                             <td>{{ url.category }}</td>
                             <td>{{ url.date_added }}</td>
@@ -142,11 +143,12 @@
                             <td>{{ 'Active' if url.status else 'Inactive' }}</td>
                             <td>
                                 <div class="ui icon buttons">
-                                <a href="{{ url_for('admin.blacklist_toggle_status', id=url.id) }}" 
+                                <a href="{{ url_for('admin.blacklist_toggle_status', id=url.id, page=request.args.get('page', 1)) }}"
                                     class="ui icon button {{ 'green' if url.status else 'yellow' }}" 
                                     title="Toggle Status">
-                                        <i class="{{ 'toggle on' if url.status else 'toggle off' }} icon"></i>
-                                </a>  
+                                    <i class="{{ 'toggle on' if url.status else 'toggle off' }} icon"></i>
+                                </a> 
+ 
                                 <a href="{{ url_for('admin.blacklist_remove_url', id=url.id) }}" 
                                     class="ui red icon button" 
                                     onclick="return confirm('Are you sure you want to remove this URL?');" 
@@ -255,5 +257,42 @@
             }
 
         });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const highlightId = "{{ highlight }}";
+            if (highlightId) {
+                const row = document.getElementById(`row-${highlightId}`);
+                if (row) {
+                    const offset = -100; // ระยะห่างจากด้านบน
+                    const bodyRect = document.body.getBoundingClientRect().top;
+                    const elementRect = row.getBoundingClientRect().top;
+                    const elementPosition = elementRect - bodyRect;
+                    const offsetPosition = elementPosition + offset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+
+                    row.classList.add('flash-highlight');
+                    setTimeout(() => row.classList.remove('flash-highlight'), 2000);
+                }
+            }
+        });
+
     </script>
+<style>
+    .flash-highlight {
+        animation: highlightAnimation 2s ease-out;
+    }
+
+    @keyframes highlightAnimation {
+        0% {
+            background-color: #ffff99;
+        }
+        100% {
+            background-color: transparent;
+        }
+    }
+</style>
 {% endblock %}

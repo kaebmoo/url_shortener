@@ -14,3 +14,4 @@ httpx
 aiohttp
 slowapi
 psycopg2
+pyotp
