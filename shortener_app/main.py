@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from typing import List, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, unquote
 
 import aiohttp
 import httpx
@@ -161,18 +161,28 @@ def get_secret_key(authorization: str = Header(...)):
 async def check_phishing(url: str, background_tasks: BackgroundTasks):
     ''' add background tasks for update phishing urls '''
     # Schedule the feed to be updated if necessary
+    """Check if the provided URL is flagged as phishing."""
     if datetime.now() - phishing_data.last_update_time > timedelta(hours=12):
         background_tasks.add_task(phishing_data.update_phishing_urls)
     
+    url = normalize_url(unquote(url), trailing_slash=False)
     if url in phishing_data.phishing_urls:
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
-            content={"message": "The URL is flagged as a phishing site based on OpenPhish and Phishing Army data", "status_code": 403}
+            content={
+                "message":
+                    "The URL is flagged as a phishing site based on data from "
+                    "OpenPhish and Phishing Army. Access to this URL is restricted.",
+                "status_code": 403,
+            },
         )
     
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"message": "The URL is not flagged as a phishing site based on OpenPhish and Phishing Army data", "status_code": 200}
+        content={"message":
+                "The URL is not flagged as a phishing site based on data from "
+                "OpenPhish and Phishing Army. Access is permitted.",
+            "status_code": 200},
     )
 
 def get_admin_info(db_url: models.URL) -> schemas.URLInfo:
@@ -213,23 +223,35 @@ def raise_not_found(request):
 
 def raise_forbidden(message):
     ''' raise exception 403 '''
+    if not message:
+        message = "You do not have permission to access this resource. Please check your credentials or contact support."
     raise HTTPException(status_code=403, detail=message)
 
 def raise_bad_request(message):
     ''' raise exception bad request '''
+    if not message:
+        message = "The request could not be processed due to invalid input. Please check your request parameters."
     raise HTTPException(status_code=400, detail=message)
 
 def raise_already_used(message):
     ''' raise exception already use '''
+    if not message:
+        message = "The requested resource is already in use. Please try a different value."
     raise HTTPException(status_code=400, detail=message)
 
 def raise_not_reachable(message):
     ''' raise exception 504 '''
+    if not message:
+        message = "The target server is not responding or cannot be reached. Please try again later or check if the URL is correct."
     raise HTTPException(status_code=504, detail=message)
 
 def raise_api_key(api_key: str):
-    ''' raise exception 401 '''
-    message = f"API key '{api_key}' is missing or invalid"
+    ''' raise exception 401. Raise an exception when the API key is missing or invalid. '''
+    message = (
+        f"API key '{api_key}' is missing or invalid. "
+        "Ensure you provide a valid API key in the 'X-API-KEY' header. "
+        "If you do not have an API key, please register for one."
+    )
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=message)
 
 def normalize_url(url: str, trailing_slash: bool = False) -> str:
@@ -286,24 +308,33 @@ def get_optional_api_db():
     return None
 
 def verify_jwt_token(authorization: str = Header(None)):
-    ''' verify jwt token '''
+    ''' verify jwt token. Verify the JWT token and raise appropriate errors.'''
     try:
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header is missing. Please provide a valid JWT token."
+            )
+        
         token = authorization.split(" ")[1]
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload["sub"] != "user_management":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid token subject",
+                detail=(
+                    "Invalid token subject. Ensure you are using a token "
+                    "issued for user management purposes."
+                ),
             )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token has expired",
+            detail="The provided token has expired. Please request a new token.",
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid token",
+            detail="The provided token is invalid. Ensure the token is correct.",
         )
     
 def create_access_token():
@@ -371,9 +402,15 @@ async def websocket_endpoint(
             await asyncio.sleep(5)
 
     except WebSocketDisconnect:
-        logging.warning("WebSocket disconnected")
+        logging.warning("WebSocket disconnected unexpectedly by the client.")
+        await websocket.send_json(
+            {"message": "Connection lost. Please reconnect to continue."}
+        )
     except Exception as e:
         logging.error("Unexpected error in WebSocket connection: %s", e)
+        await websocket.send_json(
+            {"message": "An unexpected error occurred. Please try again later."}
+        )
     finally:
         # ถ้าออกจาก loop แสดงว่าไม่มีการอัพเดต หรือมีการอัพเดตแล้ว ให้ปิดการเชื่อมต่อ
         try:
@@ -640,11 +677,19 @@ async def forward_to_target_url(
     if db_url := crud.get_db_url_by_key(db=db, url_key=url_key):
         # ตรวจสอบว่าลิงก์หมดอายุแล้วหรือยัง
         if crud.is_url_expired(db_url, timedelta(days=7)):
-            raise HTTPException(status_code=410, detail="URL has expired")
+            raise HTTPException(status_code=410, detail=(
+            "The URL has expired and is no longer available. "
+            "Shortened URLs are only valid for 7 days unless extended."
+        ),)
         
         if db_url.status is not None and db_url.status.lower() == "danger":
             # เรียกใช้ call_preview_url_async และส่ง HTML กลับไปยังไคลเอนต์
-            html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
+            # html_content = await call_preview_url_async(db_url.target_url, SECRET_TOKEN)
+            html_content = await call_preview_url_async(
+                db_url.target_url, SECRET_TOKEN,
+                heading_text_h1="Warning: Dangerous URL",
+                heading_text_h3="This URL has been flagged as potentially harmful."
+            )
             return HTMLResponse(content=html_content)
         
         if has_wildcard:
@@ -683,7 +728,10 @@ async def create_url(
 
     # ตรวจสอบว่า URL อยู่ใน blacklist หรือไม่
     if crud.is_url_in_blacklist(blacklist_db, url.target_url):
-        raise_forbidden(message="The provided URL is blacklisted and cannot be shortened.")
+        raise_forbidden(message=(
+            "The provided URL is in the blacklist and cannot be shortened. "
+            "This is to prevent abuse or potential harm to users."
+        ))
 
     # ตรวจสอบว่า URL เป็น phishing หรือไม่โดยใช้ check_phishing
     phishing_check_response = await check_phishing(url.target_url, background_tasks)
@@ -708,7 +756,7 @@ async def create_url(
     
     if url.custom_key:
         if role_id is not None and role_id not in [2, 3]:
-            raise_forbidden(message="You do not have permission to use custom keys")
+            raise_forbidden(message="Custom keys are only available for VIP users. Please upgrade your account to use this feature.")
 
         if not keygen.is_valid_custom_key(url.custom_key):
             raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
@@ -717,7 +765,10 @@ async def create_url(
             raise_bad_request(message="Your provided custom key is too long. It should not exceed 15 characters.")
         
         if crud.get_db_url_by_customkey(db, url.custom_key):
-            raise_already_used(message=f"The custom key '{url.custom_key}' is already in use. Please choose a different key.")
+            raise_already_used(message=(
+            f"The custom key '{url.custom_key}' is already in use. "
+            "Please choose a different key or leave it empty to use an auto-generated key."
+        ))
 
         if url.custom_key.lower() in RESERVED_KEYS:
             raise_bad_request(message=f"The custom key '{url.custom_key}' is reserved and cannot be used.")
@@ -767,7 +818,8 @@ async def create_url_guest(
     url.custom_key = None
 
     # Normalize and validate the target URL
-    url.target_url = normalize_url(url.target_url, trailing_slash=False)
+    # url.target_url = normalize_url(url.target_url, trailing_slash=False)
+    url.target_url = normalize_url(unquote(url.target_url), trailing_slash=False)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
@@ -832,6 +884,7 @@ async def get_user_url(
             url['status'] = ''  # or another default value
         filtered_urls.append(schemas.URLUser(**url).model_dump())
 
+ 
     # ใช้ jsonable_encoder เพื่อแปลง datetime ให้เป็น string
     json_compatible_data = jsonable_encoder(filtered_urls)
     
@@ -860,9 +913,14 @@ def get_url_scan_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="Secret key or API key not found or invalid."
         )
 
-    target_url = normalize_url(target_url, trailing_slash=False)
+    # Decode URL before normalization
+    decoded_target_url = unquote(target_url)
 
-    query = db.query(models.scan_records).filter(models.scan_records.url == target_url)
+    # Normalize URL (strip trailing slashes, etc.)
+    normalized_url = normalize_url(decoded_target_url, trailing_slash=False)
+    # target_url = normalize_url(target_url, trailing_slash=False)
+
+    query = db.query(models.scan_records).filter(models.scan_records.url == normalized_url)
     # query = db.query(models.scan_records).filter(models.scan_records.url.ilike(f"%{target_url}%"))
 
     
@@ -873,7 +931,7 @@ def get_url_scan_status(
 
     if not scan_records:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Scan records not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="No scan records found for the specified URL and scan type."
         )
 
     return [
@@ -919,7 +977,7 @@ def delete_url(
 ):
     """delete url in database"""
     if db_url := crud.deactivate_db_url_by_secret_key(db, secret_key=secret_key, api_key=api_key):
-        message = f"Successfully deleted shortened URL for '{db_url.target_url}'"
+        message = f"Successfully deleted shortened URL for '{unquote(db_url.target_url)}'"
         return {"detail": message}
     else:
         raise_not_found(request)

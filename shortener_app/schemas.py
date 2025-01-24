@@ -71,7 +71,7 @@ class URLInfo(URL):
 class URLUser(BaseModel):
     key: str
     secret_key: str
-    target_url: HttpUrl
+    target_url: str  # เปลี่ยนจาก HttpUrl เป็น str
     is_active: bool
     clicks: Optional[int] = None
     created_at: Optional[datetime] = None
@@ -79,7 +79,7 @@ class URLUser(BaseModel):
     is_checked: bool
     status: Optional[str] = Field(default="")
     title: Optional[str] = None
-    favicon_url: Optional[HttpUrl] = None
+    favicon_url: Optional[str] = None  # เปลี่ยนจาก HttpUrl เป็น str
 
     model_config = ConfigDict(
         from_attributes=True
