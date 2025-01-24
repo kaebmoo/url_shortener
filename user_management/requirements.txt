@@ -28,3 +28,4 @@ yapf
 isort
 pyotp
 qrcode[pil]
+qrcodegen
