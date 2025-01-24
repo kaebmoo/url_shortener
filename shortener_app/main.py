@@ -721,7 +721,7 @@ async def create_url(
             a) target url
             b) custom key (Custom key for shortening the URL. Only available for VIP users.)
     '''
-    url.target_url = normalize_url(url.target_url, trailing_slash=False)
+    url.target_url = normalize_url(unquote(url.target_url), trailing_slash=False)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
