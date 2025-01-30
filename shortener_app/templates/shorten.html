@@ -89,9 +89,19 @@
 
                     let createdAtLocalDate = createdAtLocal.toLocaleDateString();
                     let expiresAtLocalDate = expiresAtLocal.toLocaleDateString();
+
+                    // กำหนดรูปแบบวันที่
+                    let options = { day: '2-digit', month: 'short', year: 'numeric' };
+                    let createdAtFormatted = new Intl.DateTimeFormat('en-GB', options).format(createdAtLocal);
+                    let expiresAtFormatted = new Intl.DateTimeFormat('en-GB', options).format(expiresAtLocal);
+
+                    // $('#created-at').text(createdAtLocalDate);
+                    // $('#expires-at').text(expiresAtLocalDate);
                     
-                    $('#created-at').text(createdAtLocalDate);
-                    $('#expires-at').text(expiresAtLocalDate);
+                    //  บังคับรูปแบบ
+                    $('#created-at').text(createdAtFormatted);
+                    $('#expires-at').text(expiresAtFormatted);
+
 
                     $('#qr-code').attr('src', response.qr_code);
                     $('#result').show();
