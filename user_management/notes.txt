@@ -23,3 +23,6 @@ WHERE
 SELECT setval('public.users_id_seq', (SELECT MAX(id) FROM users), true);
 -- เรียกดูข้อมูลล่าสุด
 SELECT last_value FROM public.users_id_seq;
+
+ssh tunnel to postgresql server
+ssh -f -N -p 65222 -L 5433:localhost:5432 seal@kaebmoo.com

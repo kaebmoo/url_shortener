@@ -1,7 +1,8 @@
+aiohttp
 flask==2.3.3
 Flask-Migrate==2.7.0
-redis
-rq
+redis==5.0.4
+rq==1.16.2
 Flask-Assets
 Flask-Compress
 Flask-Login
@@ -23,7 +24,7 @@ playwright
 cryptography
 Flask-CORS
 Flask-SSE
-psycopg2
+psycopg2-binary
 yapf
 isort
 pyotp

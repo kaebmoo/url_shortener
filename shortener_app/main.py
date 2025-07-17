@@ -57,6 +57,12 @@ from . import crud, keygen, models, schemas
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ''' Startup: Seed roles and fetch phishing URLs '''
+    print("SHORTENER_APP: Running startup tasks...")
+    
+    with SessionAPI() as db:
+        crud.insert_roles(db)
+
     ''' Startup: Fetch phishing URLs '''
     # Startup: Fetch phishing URLs
     phishing_data.fetch_phishing_urls()  # เรียกใช้งาน fetch_phishing_urls จากอินสแตนซ์ของ PhishingData
