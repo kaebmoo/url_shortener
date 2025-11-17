@@ -50,3 +50,5 @@ user_management/docs/users_202411231158.sql
 user_management/docs/roles_202411231203.sql
 db/users_202411231156.sql
 db/users_202411231158.sql
+sendgrid.env
+tmp/sendgrid_email.py

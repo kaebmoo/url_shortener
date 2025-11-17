@@ -33,14 +33,18 @@ class Config:
 
     # Email
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.sendgrid.net')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', 465)) # เปลี่ยน default เป็น 465 สำหรับ SMTP_SSL
     # Convert string to boolean properly
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
     MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
+    # เพิ่ม 2 บรรทัดนี้ เพื่อให้ email.py ใหม่ดึงไปใช้ได้
+    MAIL_FROM_NAME = os.environ.get('MAIL_FROM_NAME')
+    MAIL_FROM = os.environ.get('MAIL_FROM')
+    
     # EMAIL_SENDER=os.environ.get('EMAIL_SENDER')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
 
     # Analytics
     GOOGLE_ANALYTICS_ID = os.environ.get('GOOGLE_ANALYTICS_ID', '')
@@ -50,8 +54,7 @@ class Config:
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'password')
     ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'kaebmoo@gmail.com')
     EMAIL_SUBJECT_PREFIX = '[{}]'.format(APP_NAME)
-    EMAIL_SENDER = '{app_name} Admin <{email}>'.format(
-        app_name=APP_NAME, email=os.environ.get('EMAIL_SENDER'))
+    EMAIL_SENDER = '{app_name} Admin <{email}>'.format(app_name=APP_NAME, email=os.environ.get('EMAIL_SENDER'))
     # MAIL_USERNAME can't use
     # use EMAIL_SENDER for sendgrid. Verify ownership of a single email address to use as a sender.
 
