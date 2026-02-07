@@ -31,3 +31,5 @@ pyotp
 qrcode[pil]
 qrcodegen
 SQLAlchemy==1.4.46
+python-telegram-bot
+python-dotenv
