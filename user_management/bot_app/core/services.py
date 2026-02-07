@@ -3,11 +3,15 @@ import string
 import requests
 import jwt
 import datetime
+import logging
 from flask import current_app
 from app import db
 from app.models.user import User, Role, Permission
 from bot_app.config import Config
 from sqlalchemy.orm import joinedload
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # --- Helpers ---
 
@@ -41,13 +45,15 @@ def register_api_key_remote(api_key: str, role_id: int):
         # Note: SHORTENER_HOST in config might not have /api prefix in the variable itself, 
         # but the endpoint is /api/register_api_key
         url = f"{Config.SHORTENER_HOST}/api/register_api_key"
+        logger.info(f"Registering API Key for {api_key} at {url}...")
         response = requests.post(url, json=payload, headers=headers, timeout=5)
         if response.status_code not in [200, 201]:
-            print(f"Failed to register API key: {response.text}")
+            logger.error(f"Failed to register API key. Status: {response.status_code}, Body: {response.text}")
             return False
+        logger.info(f"API Key registered successfully for {api_key}")
         return True
     except Exception as e:
-        print(f"Error registering API key: {e}")
+        logger.error(f"Error registering API key: {e}")
         return False
 
 # --- Internal Model Access ---
@@ -84,6 +90,7 @@ def _get_or_create_shadow_user_model(telegram_id: int) -> User:
             db.session.commit()
             
             # Register with Shortener App (Role 1 = User)
+            logger.info(f"Created new shadow user {telegram_id}. Registering API key...")
             register_api_key_remote(user.uid, 1)
             
             # Refresh
@@ -97,21 +104,27 @@ def is_vip_model(user: User) -> bool:
 def get_url_count_model(user: User) -> int:
     headers = {'X-API-KEY': user.uid}
     try:
-        response = requests.get(f"{Config.SHORTENER_HOST}/user/url_count", headers=headers, timeout=5)
+        url = f"{Config.SHORTENER_HOST}/user/url_count"
+        logger.debug(f"Fetching URL count from {url} for user {user.uid}...")
+        response = requests.get(url, headers=headers, timeout=5)
+        
         if response.status_code == 200:
             return response.json().get('url_count', 0)
         elif response.status_code in [401, 403]:
             # Try to register/sync key and retry
-            print(f"Auth failed for {user.telegram_id}, attempting to register key...")
+            logger.warning(f"Auth failed for {user.telegram_id} (Status {response.status_code}). Attempting to register key...")
             is_vip = is_vip_model(user)
             role_id = 3 if is_vip else 1
             if register_api_key_remote(user.uid, role_id):
                  # Retry once
-                 response = requests.get(f"{Config.SHORTENER_HOST}/user/url_count", headers=headers, timeout=5)
+                 response = requests.get(url, headers=headers, timeout=5)
                  if response.status_code == 200:
                      return response.json().get('url_count', 0)
+        
+        logger.error(f"Failed to get URL count. Status: {response.status_code}, Body: {response.text}")
+                     
     except Exception as e:
-        print(f"Error fetching url count: {e}")
+        logger.error(f"Error fetching url count: {e}")
     return 9999
 
 # --- Public Services (Session-Safe) ---
@@ -164,8 +177,10 @@ def shorten_url_service(telegram_id: int, target_url: str, custom_key: str = Non
              register_api_key_remote(user.uid, 3 if is_vip else 1)
              return {"error": "Auth Error", "message": "Authentication failed. Retrying registration..."}
         else:
+            logger.error(f"Shorten failed. Status: {response.status_code}, Body: {response.text}")
             return {"error": "API Error", "message": f"Failed to shorten. Status: {response.status_code}"}
     except Exception as e:
+        logger.error(f"Shorten connection error: {e}")
         return {"error": "Connection Error", "message": str(e)}
 
 def promote_to_vip_service(telegram_id: int):
@@ -192,17 +207,20 @@ def list_urls_service(telegram_id: int):
     user = _get_or_create_shadow_user_model(telegram_id)
     headers = {'X-API-KEY': user.uid}
     try:
-        response = requests.get(f"{Config.SHORTENER_HOST}/user/urls", headers=headers, timeout=10)
+        url = f"{Config.SHORTENER_HOST}/user/urls"
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
              return response.json() # Returns list of dicts
         elif response.status_code in [401, 403]:
              register_api_key_remote(user.uid, 3 if is_vip_model(user) else 1)
              # Retry
-             response = requests.get(f"{Config.SHORTENER_HOST}/user/urls", headers=headers, timeout=10)
+             response = requests.get(url, headers=headers, timeout=10)
              if response.status_code == 200:
                  return response.json()
+        
+        logger.error(f"List URLs failed. Status: {response.status_code}, Body: {response.text}")
     except Exception as e:
-        print(f"Error fetching URLs: {e}")
+        logger.error(f"Error fetching URLs: {e}")
     return []
 
 def delete_url_service(telegram_id: int, secret_key: str):
