@@ -30,6 +30,7 @@ isort
 pyotp
 qrcode[pil]
 qrcodegen
-SQLAlchemy==1.4.46
+SQLAlchemy==2.0.29
 python-telegram-bot
 python-dotenv
+validators

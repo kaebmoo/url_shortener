@@ -2,85 +2,162 @@ import logging
 import asyncio
 import base64
 import io
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, Application
+import html
+import time
+from collections import defaultdict
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ChatAction
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters, Application
+from telegram.error import RetryAfter, TimedOut
 from bot_app.config import Config
 from bot_app.core.services import (
-    get_user_info, 
-    shorten_url_service, 
+    get_user_info,
+    shorten_url_service,
     promote_to_vip_service,
     list_urls_service,
-    delete_url_service
+    delete_url_service,
+    is_valid_url
 )
-from app import db 
 
 logger = logging.getLogger(__name__)
 
-# Helper to run function with app context
+# --- Rate Limiting ---
+# Simple in-memory rate limiter (per user)
+user_last_action = defaultdict(float)
+RATE_LIMIT_SECONDS = 2  # Minimum seconds between actions per user
+
+def check_rate_limit(user_id: int) -> bool:
+    """Check if user is rate limited. Returns True if allowed, False if limited."""
+    now = time.time()
+    last = user_last_action[user_id]
+    if now - last < RATE_LIMIT_SECONDS:
+        return False
+    user_last_action[user_id] = now
+    return True
+
+# --- Helpers ---
+
 def execute_with_context(app, func, *args, **kwargs):
+    """Run function with Flask app context."""
     with app.app_context():
-        # Ensure we return values, not objects bound to session
         return func(*args, **kwargs)
+
+async def send_typing_action(update: Update):
+    """Send typing indicator to show bot is processing."""
+    try:
+        await update.message.chat.send_action(ChatAction.TYPING)
+    except Exception:
+        pass  # Ignore errors from typing indicator
+
+async def handle_telegram_error(update: Update, error: Exception):
+    """Handle Telegram API errors gracefully."""
+    if isinstance(error, RetryAfter):
+        logger.warning(f"Rate limited by Telegram. Retry after {error.retry_after} seconds")
+        await asyncio.sleep(error.retry_after)
+        return True  # Should retry
+    elif isinstance(error, TimedOut):
+        logger.warning("Telegram request timed out")
+        return False
+    else:
+        logger.error(f"Telegram error: {error}")
+        return False
+
+# --- Command Handlers ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+
+    if not check_rate_limit(user_id):
+        return
+
     flask_app = context.application.bot_data['flask_app']
-    
+
+    await send_typing_action(update)
+
     loop = asyncio.get_running_loop()
-    
-    # Get info dict
     info = await loop.run_in_executor(None, execute_with_context, flask_app, get_user_info, user_id)
-    
+
     is_vip_user = info['is_vip']
     url_count = info['url_count']
-    
-    role_name = "VIP" if is_vip_user else "Free"
+
+    role_name = "VIP ⭐" if is_vip_user else "Free"
     limit_msg = "Unlimited" if is_vip_user else f"{url_count}/30"
-    
+
     message = (
         f"👋 Welcome to URL Shortener Bot!\n\n"
         f"Your Status: *{role_name}*\n"
         f"Usage: {limit_msg}\n\n"
         f"To shorten a URL, just send me the link.\n"
         f"Example: `https://google.com`\n\n"
-        f"To upgrade to VIP, use /upgrade."
+        f"Commands: /help"
     )
     await update.message.reply_text(message, parse_mode='Markdown')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_rate_limit(update.effective_user.id):
+        return
+
     msg = (
-        "🤖 *Bot Commands:*\n"
-        "/start - Check status\n"
+        "🤖 *Bot Commands:*\n\n"
+        "/start - Check your status\n"
         "/list - View your recent URLs\n"
         "/delete <key> - Delete a URL\n"
-        "/upgrade - Upgrade to VIP\n\n"
-        "*Shortening:*\n"
-        "Just send a URL: `https://example.com`\n"
-        "VIPs can set alias: `https://example.com my-alias`"
+        "/upgrade - Upgrade to VIP\n"
+        "/help - Show this help\n\n"
+        "*How to shorten:*\n"
+        "Just send a URL: `https://example.com`\n\n"
+        "*VIP Features:*\n"
+        "• Unlimited URLs\n"
+        "• Custom aliases: `https://example.com myalias`"
     )
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def upgrade(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_rate_limit(update.effective_user.id):
+        return
+
+    keyboard = [
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_upgrade")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     msg = (
-        "<b>Upgrade to VIP</b>\n\n"
-        "Unlock unlimited URLs and custom aliases!\n"
-        f"Price: {Config.VIP_PRICE}\n\n"
-        f"Bank: {Config.VIP_BANK}\n"
-        f"Account: <code>{Config.VIP_ACCOUNT}</code>\n\n"
-        "Please transfer and <b>send the slip image</b> here."
+        "<b>🌟 Upgrade to VIP</b>\n\n"
+        "Unlock premium features:\n"
+        "• ♾️ Unlimited URLs\n"
+        "• ✨ Custom aliases\n"
+        "• 🚀 Priority support\n\n"
+        f"<b>Price:</b> {Config.VIP_PRICE}\n\n"
+        f"<b>Bank:</b> {Config.VIP_BANK}\n"
+        f"<b>Account:</b> <code>{Config.VIP_ACCOUNT}</code>\n\n"
+        "📸 After transfer, <b>send the slip image</b> here."
     )
-    await update.message.reply_text(msg, parse_mode='HTML')
+    await update.message.reply_text(msg, parse_mode='HTML', reply_markup=reply_markup)
+
+async def cancel_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle cancel button in upgrade flow."""
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        "❌ Upgrade cancelled.\n\nUse /upgrade anytime to see the options again."
+    )
 
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_rate_limit(update.effective_user.id):
+        return
+
     if not Config.ADMIN_TELEGRAM_ID:
-        await update.message.reply_text("Admin contact not configured. Please contact support.")
+        await update.message.reply_text(
+            "⚠️ Admin contact not configured.\n"
+            "Please contact support for manual upgrade."
+        )
         return
 
     user = update.effective_user
-    photo = update.message.photo[-1] # Best quality
-    caption = f"Slip from User: `{user.id}`\nName: {user.first_name}\nApprove cmd: `/approve {user.id}`"
-    
-    # Forward to Admin
+    photo = update.message.photo[-1]  # Best quality
+    caption = f"💳 Slip from User: `{user.id}`\nName: {user.first_name}\n\nApprove: `/approve {user.id}`"
+
     try:
         await context.bot.send_photo(
             chat_id=Config.ADMIN_TELEGRAM_ID,
@@ -88,148 +165,252 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=caption,
             parse_mode='Markdown'
         )
-        await update.message.reply_text("✅ Slip received! Waiting for admin approval.")
+        await update.message.reply_text(
+            "✅ Slip received!\n\n"
+            "Your request is being reviewed.\n"
+            "You'll be notified once approved (usually within 24 hours)."
+        )
+    except RetryAfter as e:
+        await asyncio.sleep(e.retry_after)
+        await handle_slip(update, context)
     except Exception as e:
         logger.error(f"Failed to forward slip: {e}")
-        await update.message.reply_text("❌ Failed to send slip. Please try again.")
+        await update.message.reply_text(
+            "❌ Failed to send slip.\n"
+            "Please try again later or contact support."
+        )
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     flask_app = context.application.bot_data['flask_app']
-    
+
     # Check if sender is admin
     if str(user_id) != str(Config.ADMIN_TELEGRAM_ID):
-        return # Ignore non-admins
-        
+        return  # Ignore non-admins
+
     try:
-        target_uid = int(context.args[0]) # This is Telegram ID
+        target_uid = int(context.args[0])
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /approve <telegram_id>")
+        await update.message.reply_text(
+            "Usage: `/approve <telegram_id>`\n"
+            "Example: `/approve 123456789`",
+            parse_mode='Markdown'
+        )
         return
 
+    await send_typing_action(update)
+
     loop = asyncio.get_running_loop()
-    
     success = await loop.run_in_executor(None, execute_with_context, flask_app, promote_to_vip_service, target_uid)
-    
+
     if success:
-        await update.message.reply_text(f"✅ User `{target_uid}` promoted to VIP successfully.")
-        
-        # Notify the user
+        await update.message.reply_text(f"✅ User `{target_uid}` promoted to VIP!", parse_mode='Markdown')
+
         try:
-            await context.bot.send_message(chat_id=target_uid, text="🎉 Your account has been upgraded to VIP! Enjoy unlimited URLs and custom aliases.")
+            await context.bot.send_message(
+                chat_id=target_uid,
+                text=(
+                    "🎉 *Congratulations!*\n\n"
+                    "Your account has been upgraded to VIP!\n\n"
+                    "You now have:\n"
+                    "• ♾️ Unlimited URLs\n"
+                    "• ✨ Custom aliases\n\n"
+                    "Enjoy! 🚀"
+                ),
+                parse_mode='Markdown'
+            )
         except Exception as e:
-            await update.message.reply_text(f"⚠️ Promoted, but failed to notify user: {e}")
+            await update.message.reply_text(f"⚠️ Promoted, but couldn't notify user: {e}")
     else:
-        await update.message.reply_text(f"❌ Failed to promote user `{target_uid}`. User might not exist.")
+        await update.message.reply_text(
+            f"❌ Failed to promote user `{target_uid}`.\n"
+            "User might not exist or hasn't used the bot yet.",
+            parse_mode='Markdown'
+        )
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not check_rate_limit(user_id):
+        await update.message.reply_text("⏳ Please wait a moment before sending another request.")
+        return
+
     text = update.message.text.strip()
-    parts = text.split()
+    if not text:
+        return
+
+    parts = text.split(maxsplit=1)
     target_url = parts[0]
     custom_alias = parts[1] if len(parts) > 1 else None
-    
-    user_id = update.effective_user.id
+
+    # Quick validation before showing typing
+    if not is_valid_url(target_url) and not target_url.startswith(('http://', 'https://')):
+        # Try adding https://
+        if not is_valid_url('https://' + target_url):
+            await update.message.reply_text(
+                "⚠️ That doesn't look like a valid URL.\n\n"
+                "Please send a URL like:\n"
+                "`https://example.com`",
+                parse_mode='Markdown'
+            )
+            return
+
     flask_app = context.application.bot_data['flask_app']
-    
+
+    # Show typing indicator
+    await send_typing_action(update)
+
     loop = asyncio.get_running_loop()
-    
-    # Shorten Service (Handles Auth internally)
-    result = await loop.run_in_executor(None, execute_with_context, flask_app, shorten_url_service, user_id, target_url, custom_alias)
-    
+
+    try:
+        result = await loop.run_in_executor(
+            None, execute_with_context, flask_app, shorten_url_service, user_id, target_url, custom_alias
+        )
+    except Exception as e:
+        logger.error(f"Error in shorten service: {e}")
+        await update.message.reply_text("❌ An error occurred. Please try again later.")
+        return
+
     if "error" in result:
-        await update.message.reply_text(f"⚠️ {result['message']}")
+        error_type = result.get('error', '')
+        message = result.get('message', 'Unknown error')
+
+        # Add helpful icons based on error type
+        if error_type == "Limit Exceeded":
+            icon = "📊"
+        elif error_type == "Invalid URL":
+            icon = "🔗"
+        elif error_type == "VIP Feature":
+            icon = "⭐"
+        elif error_type == "Conflict":
+            icon = "⚠️"
+        else:
+            icon = "❌"
+
+        await update.message.reply_text(f"{icon} {message}")
     else:
         short_url = result.get('url')
         qr_code_data = result.get('qr_code')
-        
+
         if short_url:
-            msg_text = f"✅ Shortened: {short_url}"
-            
+            msg_text = f"✅ *Shortened successfully!*\n\n🔗 {short_url}"
+
             if qr_code_data and "base64," in qr_code_data:
                 try:
-                    # Decode Base64
                     base64_str = qr_code_data.split("base64,")[1]
                     img_data = base64.b64decode(base64_str)
                     photo_file = io.BytesIO(img_data)
                     photo_file.name = "qr_code.png"
-                    
-                    await update.message.reply_photo(photo=photo_file, caption=msg_text)
+
+                    await update.message.reply_photo(photo=photo_file, caption=msg_text, parse_mode='Markdown')
                 except Exception as e:
                     logger.error(f"Failed to send QR code: {e}")
-                    await update.message.reply_text(msg_text)
+                    await update.message.reply_text(msg_text, parse_mode='Markdown')
             else:
-                await update.message.reply_text(msg_text)
+                await update.message.reply_text(msg_text, parse_mode='Markdown')
         else:
-            await update.message.reply_text("❌ Unknown error.")
-
-import html
+            await update.message.reply_text("❌ Failed to shorten URL. Please try again.")
 
 async def list_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    flask_app = context.application.bot_data['flask_app']
-    loop = asyncio.get_running_loop()
-    
-    urls = await loop.run_in_executor(None, execute_with_context, flask_app, list_urls_service, user_id)
-    
-    if not urls:
-        await update.message.reply_text("📭 You haven't shortened any URLs yet.")
+
+    if not check_rate_limit(user_id):
         return
 
-    # Sort by created_at desc (if available) or just reverse
-    urls = urls[-10:] # Get last 10
-    urls.reverse() # Newest first
-    
-    msg = "<b>Your Recent URLs:</b>\n\n"
-    for item in urls:
+    flask_app = context.application.bot_data['flask_app']
+
+    await send_typing_action(update)
+
+    loop = asyncio.get_running_loop()
+    urls = await loop.run_in_executor(None, execute_with_context, flask_app, list_urls_service, user_id)
+
+    if not urls:
+        await update.message.reply_text(
+            "📭 You haven't shortened any URLs yet.\n\n"
+            "Send me a URL to get started!"
+        )
+        return
+
+    # Get last 10, newest first
+    urls = urls[-10:]
+    urls.reverse()
+
+    msg = "<b>📋 Your Recent URLs:</b>\n\n"
+    for i, item in enumerate(urls, 1):
         orig = item.get('target_url', '???')
-        short = item.get('url', '???') 
-        
-        # so we need to construct it or use what's available.
+        short = item.get('url', '???')
         key = item.get('key')
         clicks = item.get('clicks', 0)
-        
-        # Construct full URL if missing
+
         if 'url' not in item and key:
-             short = f"{Config.SHORTENER_HOST}/{key}"
-        
+            short = f"{Config.SHORTENER_HOST}/{key}"
+
         secret = item.get('secret_key') or 'unknown'
-        
-        # Escape content for HTML
-        safe_orig = html.escape(orig)
+
+        # Truncate long URLs for display
+        if len(orig) > 40:
+            orig_display = orig[:37] + "..."
+        else:
+            orig_display = orig
+
+        safe_orig = html.escape(orig_display)
         safe_short = html.escape(short)
         safe_secret = html.escape(secret)
-        
-        msg += f"🔗 <a href='{safe_short}'>{safe_short}</a>\nOf: {safe_orig}\nClicks: {clicks}\nDelete: <code>/delete {safe_secret}</code>\n\n"
-        
+
+        msg += (
+            f"<b>{i}.</b> <a href='{safe_short}'>{safe_short}</a>\n"
+            f"   └ {safe_orig}\n"
+            f"   └ 📊 {clicks} clicks\n"
+            f"   └ 🗑 <code>/delete {safe_secret}</code>\n\n"
+        )
+
     await update.message.reply_text(msg, parse_mode='HTML', disable_web_page_preview=True)
 
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+
+    if not check_rate_limit(user_id):
+        return
+
     flask_app = context.application.bot_data['flask_app']
-    
+
     try:
         secret_key = context.args[0]
     except (IndexError, ValueError):
-        await update.message.reply_text("Usage: /delete <secret_key>\nCheck /list to find your secret keys.")
+        await update.message.reply_text(
+            "Usage: `/delete <secret_key>`\n\n"
+            "Use /list to find your secret keys.",
+            parse_mode='Markdown'
+        )
         return
+
+    await send_typing_action(update)
 
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, execute_with_context, flask_app, delete_url_service, user_id, secret_key)
-    
+
     if result['success']:
-        await update.message.reply_text("✅ URL deleted successfully.")
+        await update.message.reply_text("✅ URL deleted successfully!")
     else:
         await update.message.reply_text(f"❌ {result['message']}")
 
+# --- Handler Setup ---
+
 def setup_handlers(application: Application):
+    """Register all handlers with the application."""
+    # Command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("upgrade", upgrade))
     application.add_handler(CommandHandler("approve", approve))
     application.add_handler(CommandHandler("list", list_urls))
     application.add_handler(CommandHandler("delete", delete_url))
-    
-    # Handle Slips (Photos)
+
+    # Callback handlers (for inline buttons)
+    application.add_handler(CallbackQueryHandler(cancel_upgrade_callback, pattern="^cancel_upgrade$"))
+
+    # Photo handler (for slips)
     application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
-    
-    # Handle URLs (Text)
+
+    # Text message handler (for URLs)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
