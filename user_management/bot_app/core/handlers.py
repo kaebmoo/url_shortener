@@ -201,7 +201,7 @@ async def list_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
         safe_short = html.escape(short)
         safe_secret = html.escape(secret)
         
-        msg += f"🔗 <a href='{safe_short}'>{safe_short}</a>\nOf: {safe_orig}\n📊 Clicks: {clicks}\n🗑 Delete: <code>/delete {safe_secret}</code>\n\n"
+        msg += f"🔗 <a href='{safe_short}'>{safe_short}</a>\nOf: {safe_orig}\nClicks: {clicks}\nDelete: <code>/delete {safe_secret}</code>\n\n"
         
     await update.message.reply_text(msg, parse_mode='HTML', disable_web_page_preview=True)
 
