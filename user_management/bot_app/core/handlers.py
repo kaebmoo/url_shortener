@@ -138,9 +138,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "error" in result:
         await update.message.reply_text(f"⚠️ {result['message']}")
     else:
-        # DEBUG: Print result to see if qr_code exists
-        print(f"DEBUG API Result: {result}")
-        
         short_url = result.get('url')
         qr_code_data = result.get('qr_code')
         

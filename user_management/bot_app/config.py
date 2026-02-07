@@ -9,6 +9,4 @@ class Config:
     VIP_PRICE = os.environ.get('VIP_PRICE', '99 THB/Year')
     VIP_BANK = os.environ.get('VIP_BANK', 'Unknown Bank')
     VIP_ACCOUNT = os.environ.get('VIP_ACCOUNT', 'Unknown Account')
-
-    print(f"DEBUG: Config.ADMIN_TELEGRAM_ID = {ADMIN_TELEGRAM_ID}")
     # Add other bot-specific configs here
