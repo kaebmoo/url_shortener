@@ -52,3 +52,4 @@ db/users_202411231156.sql
 db/users_202411231158.sql
 sendgrid.env
 tmp/sendgrid_email.py
+user_management/test_sync.py

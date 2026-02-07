@@ -61,6 +61,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
     uid = db.Column(db.String(64), unique=True, index=True)
+    telegram_id = db.Column(db.String(64), unique=True, index=True, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())  # เพิ่มฟิลด์วันที่และเวลาในการสร้าง
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=db.func.now())       # เพิ่มฟิลด์วันที่และเวลาในการอัปเดต
 

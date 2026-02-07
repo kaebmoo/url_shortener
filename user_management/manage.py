@@ -178,10 +178,23 @@ def format():
     subprocess.call(isort, shell=True)
 
     print('Running {}'.format(yapf))
+    print('Running {}'.format(yapf))
     subprocess.call(yapf, shell=True)
+
+
+@app.cli.command("run_bot")
+def run_bot():
+    """Runs the Telegram Bot."""
+    from bot_app.run import run_bot as start_bot
+    start_bot()
 
 
 if __name__ == '__main__':
     # manager.run()
     # socketio.run(app, debug=True, port=5000)
-    app.run(debug=True, port=5000)
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == 'run_bot':
+        from bot_app.run import run_bot as start_bot
+        start_bot()
+    else:
+        app.run(debug=True, port=5000)
