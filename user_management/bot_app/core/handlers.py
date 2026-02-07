@@ -62,14 +62,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def upgrade(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "💎 *Upgrade to VIP*\n\n"
+        "<b>Upgrade to VIP</b>\n\n"
         "Unlock unlimited URLs and custom aliases!\n"
-        "Price: 100 THB/Month\n\n"
-        "💰 Bank Request: [BANK NAME]\n"
-        "Account: 123-4-56789-0\n\n"
-        "Please transfer and *send the slip image* here."
+        f"Price: {Config.VIP_PRICE}\n\n"
+        f"Bank: {Config.VIP_BANK}\n"
+        f"Account: <code>{Config.VIP_ACCOUNT}</code>\n\n"
+        "Please transfer and <b>send the slip image</b> here."
     )
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    await update.message.reply_text(msg, parse_mode='HTML')
 
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not Config.ADMIN_TELEGRAM_ID:
@@ -181,7 +181,7 @@ async def list_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
     urls = urls[-10:] # Get last 10
     urls.reverse() # Newest first
     
-    msg = "<b>📜 Your Recent URLs:</b>\n\n"
+    msg = "<b>Your Recent URLs:</b>\n\n"
     for item in urls:
         orig = item.get('target_url', '???')
         short = item.get('url', '???') 
