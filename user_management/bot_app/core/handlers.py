@@ -4,6 +4,7 @@ import base64
 import io
 import html
 import time
+from datetime import datetime
 from collections import defaultdict
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
@@ -22,9 +23,8 @@ from bot_app.core.services import (
 logger = logging.getLogger(__name__)
 
 # --- Rate Limiting ---
-# Simple in-memory rate limiter (per user)
 user_last_action = defaultdict(float)
-RATE_LIMIT_SECONDS = 2  # Minimum seconds between actions per user
+RATE_LIMIT_SECONDS = 2
 
 def check_rate_limit(user_id: int) -> bool:
     """Check if user is rate limited. Returns True if allowed, False if limited."""
@@ -34,6 +34,28 @@ def check_rate_limit(user_id: int) -> bool:
         return False
     user_last_action[user_id] = now
     return True
+
+# --- Pending Requests Storage ---
+# In-memory storage for pending upgrade requests
+# Format: {telegram_id: {"name": str, "timestamp": datetime, "photo_file_id": str}}
+pending_requests = {}
+
+def add_pending_request(user_id: int, user_name: str, photo_file_id: str):
+    """Add a pending upgrade request."""
+    pending_requests[user_id] = {
+        "name": user_name,
+        "timestamp": datetime.now(),
+        "photo_file_id": photo_file_id
+    }
+
+def remove_pending_request(user_id: int):
+    """Remove a pending request after approval/rejection."""
+    if user_id in pending_requests:
+        del pending_requests[user_id]
+
+def get_pending_requests():
+    """Get all pending requests."""
+    return pending_requests.copy()
 
 # --- Helpers ---
 
@@ -47,20 +69,24 @@ async def send_typing_action(update: Update):
     try:
         await update.message.chat.send_action(ChatAction.TYPING)
     except Exception:
-        pass  # Ignore errors from typing indicator
+        pass
 
 async def handle_telegram_error(update: Update, error: Exception):
     """Handle Telegram API errors gracefully."""
     if isinstance(error, RetryAfter):
         logger.warning(f"Rate limited by Telegram. Retry after {error.retry_after} seconds")
         await asyncio.sleep(error.retry_after)
-        return True  # Should retry
+        return True
     elif isinstance(error, TimedOut):
         logger.warning("Telegram request timed out")
         return False
     else:
         logger.error(f"Telegram error: {error}")
         return False
+
+def is_admin(user_id: int) -> bool:
+    """Check if user is admin."""
+    return str(user_id) == str(Config.ADMIN_TELEGRAM_ID)
 
 # --- Command Handlers ---
 
@@ -143,6 +169,8 @@ async def cancel_upgrade_callback(update: Update, context: ContextTypes.DEFAULT_
         "❌ Upgrade cancelled.\n\nUse /upgrade anytime to see the options again."
     )
 
+# --- Slip & Admin Handlers ---
+
 async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not check_rate_limit(update.effective_user.id):
         return
@@ -156,15 +184,35 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
     photo = update.message.photo[-1]  # Best quality
-    caption = f"💳 Slip from User: `{user.id}`\nName: {user.first_name}\n\nApprove: `/approve {user.id}`"
+
+    # Create inline keyboard for admin
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user.id}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user.id}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    caption = (
+        f"💳 <b>New Upgrade Request</b>\n\n"
+        f"👤 User ID: <code>{user.id}</code>\n"
+        f"📛 Name: {html.escape(user.first_name or 'Unknown')}\n"
+        f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
 
     try:
         await context.bot.send_photo(
             chat_id=Config.ADMIN_TELEGRAM_ID,
             photo=photo.file_id,
             caption=caption,
-            parse_mode='Markdown'
+            parse_mode='HTML',
+            reply_markup=reply_markup
         )
+
+        # Store pending request
+        add_pending_request(user.id, user.first_name or "Unknown", photo.file_id)
+
         await update.message.reply_text(
             "✅ Slip received!\n\n"
             "Your request is being reviewed.\n"
@@ -180,13 +228,178 @@ async def handle_slip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Please try again later or contact support."
         )
 
+async def approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle approve button click from admin."""
+    query = update.callback_query
+
+    # Verify admin
+    if not is_admin(query.from_user.id):
+        await query.answer("⛔ Unauthorized", show_alert=True)
+        return
+
+    # Extract user ID from callback data
+    try:
+        target_uid = int(query.data.split("_")[1])
+    except (IndexError, ValueError):
+        await query.answer("❌ Invalid request", show_alert=True)
+        return
+
+    await query.answer("Processing...")
+
+    flask_app = context.application.bot_data['flask_app']
+    loop = asyncio.get_running_loop()
+
+    success = await loop.run_in_executor(
+        None, execute_with_context, flask_app, promote_to_vip_service, target_uid
+    )
+
+    if success:
+        # Remove from pending
+        remove_pending_request(target_uid)
+
+        # Update admin message
+        await query.edit_message_caption(
+            caption=f"{query.message.caption}\n\n✅ <b>APPROVED</b> by admin",
+            parse_mode='HTML'
+        )
+
+        # Notify user
+        try:
+            await context.bot.send_message(
+                chat_id=target_uid,
+                text=(
+                    "🎉 *Congratulations!*\n\n"
+                    "Your account has been upgraded to VIP!\n\n"
+                    "You now have:\n"
+                    "• ♾️ Unlimited URLs\n"
+                    "• ✨ Custom aliases\n\n"
+                    "Enjoy! 🚀"
+                ),
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.warning(f"Could not notify user {target_uid}: {e}")
+    else:
+        await query.edit_message_caption(
+            caption=f"{query.message.caption}\n\n❌ <b>FAILED</b> - User not found",
+            parse_mode='HTML'
+        )
+
+async def reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle reject button click from admin."""
+    query = update.callback_query
+
+    # Verify admin
+    if not is_admin(query.from_user.id):
+        await query.answer("⛔ Unauthorized", show_alert=True)
+        return
+
+    # Extract user ID from callback data
+    try:
+        target_uid = int(query.data.split("_")[1])
+    except (IndexError, ValueError):
+        await query.answer("❌ Invalid request", show_alert=True)
+        return
+
+    # Show reason selection
+    keyboard = [
+        [InlineKeyboardButton("💳 Invalid slip", callback_data=f"reject_reason_{target_uid}_invalid")],
+        [InlineKeyboardButton("💰 Amount incorrect", callback_data=f"reject_reason_{target_uid}_amount")],
+        [InlineKeyboardButton("🔍 Cannot verify", callback_data=f"reject_reason_{target_uid}_verify")],
+        [InlineKeyboardButton("❌ Other reason", callback_data=f"reject_reason_{target_uid}_other")],
+        [InlineKeyboardButton("⬅️ Back", callback_data=f"back_{target_uid}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.answer()
+    await query.edit_message_reply_markup(reply_markup=reply_markup)
+
+async def reject_reason_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle rejection with reason."""
+    query = update.callback_query
+
+    if not is_admin(query.from_user.id):
+        await query.answer("⛔ Unauthorized", show_alert=True)
+        return
+
+    # Parse callback: reject_reason_{user_id}_{reason}
+    parts = query.data.split("_")
+    try:
+        target_uid = int(parts[2])
+        reason_code = parts[3]
+    except (IndexError, ValueError):
+        await query.answer("❌ Invalid request", show_alert=True)
+        return
+
+    # Map reason codes to messages
+    reason_messages = {
+        "invalid": "The slip image is invalid or unclear.",
+        "amount": "The transfer amount is incorrect.",
+        "verify": "We couldn't verify the payment.",
+        "other": "Your request could not be approved at this time."
+    }
+    reason = reason_messages.get(reason_code, "Your request was rejected.")
+
+    await query.answer("Rejecting...")
+
+    # Remove from pending
+    remove_pending_request(target_uid)
+
+    # Update admin message
+    await query.edit_message_caption(
+        caption=f"{query.message.caption}\n\n❌ <b>REJECTED</b>\nReason: {reason}",
+        parse_mode='HTML'
+    )
+
+    # Notify user
+    try:
+        await context.bot.send_message(
+            chat_id=target_uid,
+            text=(
+                "❌ *Upgrade Request Declined*\n\n"
+                f"Reason: {reason}\n\n"
+                "If you believe this is an error, please:\n"
+                "1. Make sure your transfer is complete\n"
+                "2. Send a clear slip image\n"
+                "3. Try again with /upgrade"
+            ),
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        logger.warning(f"Could not notify user {target_uid}: {e}")
+
+async def back_to_approve_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle back button to return to approve/reject options."""
+    query = update.callback_query
+
+    if not is_admin(query.from_user.id):
+        await query.answer("⛔ Unauthorized", show_alert=True)
+        return
+
+    try:
+        target_uid = int(query.data.split("_")[1])
+    except (IndexError, ValueError):
+        await query.answer("❌ Invalid request", show_alert=True)
+        return
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Approve", callback_data=f"approve_{target_uid}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"reject_{target_uid}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.answer()
+    await query.edit_message_reply_markup(reply_markup=reply_markup)
+
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command-based approve (still works as backup)."""
     user_id = update.effective_user.id
     flask_app = context.application.bot_data['flask_app']
 
-    # Check if sender is admin
-    if str(user_id) != str(Config.ADMIN_TELEGRAM_ID):
-        return  # Ignore non-admins
+    if not is_admin(user_id):
+        return
 
     try:
         target_uid = int(context.args[0])
@@ -204,6 +417,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = await loop.run_in_executor(None, execute_with_context, flask_app, promote_to_vip_service, target_uid)
 
     if success:
+        remove_pending_request(target_uid)
         await update.message.reply_text(f"✅ User `{target_uid}` promoted to VIP!", parse_mode='Markdown')
 
         try:
@@ -228,6 +442,72 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
 
+async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command-based reject."""
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        return
+
+    try:
+        target_uid = int(context.args[0])
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else "No reason provided."
+    except (IndexError, ValueError):
+        await update.message.reply_text(
+            "Usage: `/reject <telegram_id> [reason]`\n"
+            "Example: `/reject 123456789 Invalid slip`",
+            parse_mode='Markdown'
+        )
+        return
+
+    remove_pending_request(target_uid)
+    await update.message.reply_text(f"❌ User `{target_uid}` rejected.", parse_mode='Markdown')
+
+    try:
+        await context.bot.send_message(
+            chat_id=target_uid,
+            text=(
+                "❌ *Upgrade Request Declined*\n\n"
+                f"Reason: {reason}\n\n"
+                "If you believe this is an error, please:\n"
+                "1. Make sure your transfer is complete\n"
+                "2. Send a clear slip image\n"
+                "3. Try again with /upgrade"
+            ),
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Rejected, but couldn't notify user: {e}")
+
+async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show pending upgrade requests (admin only)."""
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        return
+
+    requests = get_pending_requests()
+
+    if not requests:
+        await update.message.reply_text("📭 No pending upgrade requests.")
+        return
+
+    msg = "<b>📋 Pending Upgrade Requests:</b>\n\n"
+    for uid, data in requests.items():
+        time_str = data['timestamp'].strftime('%Y-%m-%d %H:%M')
+        msg += (
+            f"👤 <b>{html.escape(data['name'])}</b>\n"
+            f"   ID: <code>{uid}</code>\n"
+            f"   🕐 {time_str}\n"
+            f"   → /approve {uid}\n"
+            f"   → /reject {uid}\n\n"
+        )
+
+    msg += f"<i>Total: {len(requests)} pending</i>"
+    await update.message.reply_text(msg, parse_mode='HTML')
+
+# --- URL Handlers ---
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -245,7 +525,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Quick validation before showing typing
     if not is_valid_url(target_url) and not target_url.startswith(('http://', 'https://')):
-        # Try adding https://
         if not is_valid_url('https://' + target_url):
             await update.message.reply_text(
                 "⚠️ That doesn't look like a valid URL.\n\n"
@@ -257,7 +536,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     flask_app = context.application.bot_data['flask_app']
 
-    # Show typing indicator
     await send_typing_action(update)
 
     loop = asyncio.get_running_loop()
@@ -275,7 +553,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         error_type = result.get('error', '')
         message = result.get('message', 'Unknown error')
 
-        # Add helpful icons based on error type
         if error_type == "Limit Exceeded":
             icon = "📊"
         elif error_type == "Invalid URL":
@@ -331,7 +608,6 @@ async def list_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Get last 10, newest first
     urls = urls[-10:]
     urls.reverse()
 
@@ -347,7 +623,6 @@ async def list_urls(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         secret = item.get('secret_key') or 'unknown'
 
-        # Truncate long URLs for display
         if len(orig) > 40:
             orig_display = orig[:37] + "..."
         else:
@@ -403,11 +678,17 @@ def setup_handlers(application: Application):
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("upgrade", upgrade))
     application.add_handler(CommandHandler("approve", approve))
+    application.add_handler(CommandHandler("reject", reject))
+    application.add_handler(CommandHandler("pending", pending))
     application.add_handler(CommandHandler("list", list_urls))
     application.add_handler(CommandHandler("delete", delete_url))
 
     # Callback handlers (for inline buttons)
     application.add_handler(CallbackQueryHandler(cancel_upgrade_callback, pattern="^cancel_upgrade$"))
+    application.add_handler(CallbackQueryHandler(approve_callback, pattern="^approve_\\d+$"))
+    application.add_handler(CallbackQueryHandler(reject_callback, pattern="^reject_\\d+$"))
+    application.add_handler(CallbackQueryHandler(reject_reason_callback, pattern="^reject_reason_\\d+_"))
+    application.add_handler(CallbackQueryHandler(back_to_approve_reject, pattern="^back_\\d+$"))
 
     # Photo handler (for slips)
     application.add_handler(MessageHandler(filters.PHOTO, handle_slip))
