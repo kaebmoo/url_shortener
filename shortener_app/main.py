@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from typing import List, Optional
-from urllib.parse import urljoin, urlparse, unquote
+from urllib.parse import urljoin, urlparse, unquote, quote
 
 import aiohttp
 import httpx
@@ -170,8 +170,8 @@ async def check_phishing(url: str, background_tasks: BackgroundTasks):
     """Check if the provided URL is flagged as phishing."""
     if datetime.now() - phishing_data.last_update_time > timedelta(hours=12):
         background_tasks.add_task(phishing_data.update_phishing_urls)
-    
-    url = normalize_url(unquote(url), trailing_slash=False)
+
+    url = normalize_url(url, trailing_slash=False)
     if url in phishing_data.phishing_urls:
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -240,10 +240,11 @@ def raise_bad_request(message):
     raise HTTPException(status_code=400, detail=message)
 
 def raise_already_used(message):
-    ''' raise exception already use '''
+    ''' raise exception already use - for duplicate custom keys '''
     if not message:
         message = "The requested resource is already in use. Please try a different value."
-    raise HTTPException(status_code=400, detail=message)
+    # Return 409 Conflict instead of 400 for better clarity
+    raise HTTPException(status_code=409, detail=message)
 
 def raise_not_reachable(message):
     ''' raise exception 504 '''
@@ -262,6 +263,7 @@ def raise_api_key(api_key: str):
 
 def normalize_url(url: str, trailing_slash: bool = False) -> str:
     """Normalizes a URL by optionally adding or removing trailing slashes.
+    Preserves URL encoding to keep special characters intact.
 
     Args:
         url: The URL to normalize.
@@ -273,13 +275,48 @@ def normalize_url(url: str, trailing_slash: bool = False) -> str:
     # Strip leading and trailing whitespace from the URL
     url = url.strip()
 
+    # Parse URL to handle components separately
     parsed_url = urlparse(url)
-    path = parsed_url.path.rstrip("/")  # Remove all trailing slashes from the path
-    
-    if trailing_slash:
-        path += "/"  # Add a single trailing slash if requested
 
+    # Normalize path: remove trailing slashes
+    path = parsed_url.path.rstrip("/")
+
+    if trailing_slash and path:  # Only add trailing slash if path is not empty
+        path += "/"
+
+    # Reconstruct URL with normalized components
+    # This preserves URL encoding in the original URL
     return parsed_url._replace(path=path).geturl()
+
+def get_canonical_url(url: str) -> str:
+    """Get canonical form of URL for duplicate detection.
+
+    Unquotes the URL to normalize different encodings of the same URL.
+    Used only for comparison, not for storage or validation.
+
+    Args:
+        url: The URL to canonicalize
+
+    Returns:
+        Canonical form of the URL (decoded and normalized)
+    """
+    # First normalize the URL structure
+    normalized = normalize_url(url, trailing_slash=False)
+
+    # Then unquote for comparison (this might create invalid URLs, but that's OK for comparison)
+    parsed = urlparse(normalized)
+
+    # Unquote path and query separately
+    canonical_path = unquote(parsed.path)
+    canonical_query = unquote(parsed.query) if parsed.query else ""
+
+    # Reconstruct for comparison purposes
+    canonical = parsed._replace(
+        path=canonical_path,
+        query=canonical_query
+    )
+
+    return canonical.geturl().lower()  # Case-insensitive comparison
 
 # ฐานข้อมูลหลัก main database
 def get_db():
@@ -727,13 +764,22 @@ async def create_url(
             a) target url
             b) custom key (Custom key for shortening the URL. Only available for VIP users.)
     '''
-    url.target_url = normalize_url(unquote(url.target_url), trailing_slash=False)
+    # Log original URL for debugging
+    logging.info(f"[CREATE_URL] Original URL: {url.target_url}")
+    logging.info(f"[CREATE_URL] Custom key: {url.custom_key}")
+    logging.info(f"[CREATE_URL] API key: {api_key}")
+
+    # Normalize URL without unquoting to preserve URL encoding (e.g., %20 for spaces)
+    url.target_url = normalize_url(url.target_url, trailing_slash=False)
+    logging.info(f"[CREATE_URL] Normalized URL: {url.target_url}")
 
     if not validators.url(url.target_url):
-        raise_bad_request(message="Your provided URL is not valid")
+        logging.error(f"[CREATE_URL] URL validation failed: {url.target_url}")
+        raise_bad_request(message="URL ไม่ถูกต้อง / Invalid URL. กรุณาตรวจสอบว่า URL เริ่มต้นด้วย http:// หรือ https:// / Please ensure the URL starts with http:// or https://")
 
     # ตรวจสอบว่า URL อยู่ใน blacklist หรือไม่
     if crud.is_url_in_blacklist(blacklist_db, url.target_url):
+        logging.warning(f"[CREATE_URL] URL is in blacklist: {url.target_url}")
         raise_forbidden(message=(
             "The provided URL is in the blacklist and cannot be shortened. "
             "This is to prevent abuse or potential harm to users."
@@ -742,6 +788,7 @@ async def create_url(
     # ตรวจสอบว่า URL เป็น phishing หรือไม่โดยใช้ check_phishing
     phishing_check_response = await check_phishing(url.target_url, background_tasks)
     if phishing_check_response.status_code == 403:
+        logging.warning(f"[CREATE_URL] URL flagged as phishing: {url.target_url}")
         raise_forbidden(message=phishing_check_response.content["message"])
     
     # ดึง role_id จาก database ถ้ามีการกำหนดให้ใช้งาน
@@ -761,23 +808,31 @@ async def create_url(
     # ได้ role_id มาก็ขึ้นอยู่กับว่าจะเอาไปใช้ทำอะไรต่อ
     
     if url.custom_key:
+        logging.info(f"[CREATE_URL] Validating custom key: {url.custom_key}")
+
         if role_id is not None and role_id not in [2, 3]:
+            logging.warning(f"[CREATE_URL] User not authorized for custom key. Role ID: {role_id}")
             raise_forbidden(message="Custom keys are only available for VIP users. Please upgrade your account to use this feature.")
 
         if not keygen.is_valid_custom_key(url.custom_key):
-            raise_bad_request(message="Your provided custom key is not valid. It should only contain letters and digits.")
-        
+            logging.error(f"[CREATE_URL] Invalid custom key format: {url.custom_key}")
+            raise_bad_request(message=f"รหัสที่กำหนดเอง '{url.custom_key}' ไม่ถูกต้อง / Invalid custom key '{url.custom_key}'. กรุณาใช้เฉพาะตัวอักษรและตัวเลข / Please use only letters and numbers.")
+
         if len(url.custom_key) > 15:
-            raise_bad_request(message="Your provided custom key is too long. It should not exceed 15 characters.")
-        
+            logging.error(f"[CREATE_URL] Custom key too long ({len(url.custom_key)} chars): {url.custom_key}")
+            raise_bad_request(message=f"รหัสที่กำหนดเองยาวเกินไป ({len(url.custom_key)} ตัวอักษร) / Custom key is too long ({len(url.custom_key)} characters). กรุณาใช้ไม่เกิน 15 ตัวอักษร / Maximum 15 characters allowed.")
+
         if crud.get_db_url_by_customkey(db, url.custom_key):
+            logging.warning(f"[CREATE_URL] Custom key already in use: {url.custom_key}")
             raise_already_used(message=(
-            f"The custom key '{url.custom_key}' is already in use. "
-            "Please choose a different key or leave it empty to use an auto-generated key."
+            f"รหัส '{url.custom_key}' ถูกใช้งานไปแล้ว / The custom key '{url.custom_key}' is already in use. "
+            f"กรุณาเลือกรหัสอื่น เช่น '{url.custom_key}2' หรือปล่อยว่างให้ระบบสร้างให้ / "
+            f"Please try '{url.custom_key}2' or leave it empty for auto-generation."
         ))
 
         if url.custom_key.lower() in RESERVED_KEYS:
-            raise_bad_request(message=f"The custom key '{url.custom_key}' is reserved and cannot be used.")
+            logging.warning(f"[CREATE_URL] Reserved custom key attempted: {url.custom_key}")
+            raise_bad_request(message=f"รหัส '{url.custom_key}' เป็นรหัสสงวนของระบบ / The key '{url.custom_key}' is reserved. กรุณาเลือกรหัสอื่น / Please choose a different key.")
     
     # ตรวจสอบว่ามี  URL Target นี้อยู่แล้วหรือไม่สำหรับ API key นี้
     # ต้องทำเพิ่มกรณีที่มีการ custom key shorten url ให้มีการซ้ำได้ แต่ custom key ต้องไม่ซ้ำ
@@ -801,6 +856,7 @@ async def create_url(
         return JSONResponse(content=url_data, status_code=409) 
 
     db_url = crud.create_db_url(db=db, url=url, api_key=api_key)
+    logging.info(f"[CREATE_URL] Successfully created URL. Key: {db_url.key}, Target: {db_url.target_url}")
 
     # เพิ่ม task การดึงข้อมูล title และ favicon ลงใน background
     background_tasks.add_task(fetch_page_info_and_update, db_url)
@@ -823,9 +879,8 @@ async def create_url_guest(
     # บังคับให้ custom_key เป็น None เสมอสำหรับผู้ใช้ guest
     url.custom_key = None
 
-    # Normalize and validate the target URL
-    # url.target_url = normalize_url(url.target_url, trailing_slash=False)
-    url.target_url = normalize_url(unquote(url.target_url), trailing_slash=False)
+    # Normalize and validate the target URL (no unquote to preserve URL encoding)
+    url.target_url = normalize_url(url.target_url, trailing_slash=False)
 
     if not validators.url(url.target_url):
         raise_bad_request(message="Your provided URL is not valid")
@@ -919,12 +974,9 @@ def get_url_scan_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="Secret key or API key not found or invalid."
         )
 
-    # Decode URL before normalization
-    decoded_target_url = unquote(target_url)
-
     # Normalize URL (strip trailing slashes, etc.)
-    normalized_url = normalize_url(decoded_target_url, trailing_slash=False)
-    # target_url = normalize_url(target_url, trailing_slash=False)
+    # No unquote to match how URLs are stored in database (with encoding preserved)
+    normalized_url = normalize_url(target_url, trailing_slash=False)
 
     query = db.query(models.scan_records).filter(models.scan_records.url == normalized_url)
     # query = db.query(models.scan_records).filter(models.scan_records.url.ilike(f"%{target_url}%"))

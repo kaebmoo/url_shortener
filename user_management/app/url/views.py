@@ -176,17 +176,29 @@ def shorten_url():
                 # session['persistent_messages'] = message
                 # session.modified = True  # เพื่อให้แน่ใจว่า session ถูกบันทึก
             elif response.status_code == 409:
-                # status_code 409 "A short link for this website already exists."
-                short_url = url_data.get('url', 'No URL returned')
-                message = url_data.get('message','')
-                qr_code_base64 = generate_qr_code(short_url)
-                flash(f'{message}', 'warning')
+                # status_code 409 - Conflict (duplicate URL หรือ custom key ซ้ำ)
+                # กรณี URL ซ้ำ: จะมี 'url' field
+                if 'url' in url_data:
+                    short_url = url_data.get('url', 'No URL returned')
+                    message = url_data.get('message', 'A short link for this website already exists.')
+                    qr_code_base64 = generate_qr_code(short_url)
+                    flash(f'{message}', 'warning')
+                else:
+                    # กรณี custom key ซ้ำ: จะมีแค่ 'detail' message
+                    message = url_data.get('detail', 'This custom key is already in use.')
+                    flash(f'{message}', 'error')
             elif response.status_code == 400:
-                message = url_data.get('detail', '')
-                flash('Error 400 Bad Request', 'error')
+                # Bad Request - แสดง error message ที่ชัดเจนจาก backend
+                message = url_data.get('detail', 'Invalid request. Please check your input.')
+                flash(f'{message}', 'error')
+            elif response.status_code == 403:
+                # Forbidden - URL ถูกบล็อก (blacklist, phishing, หรือไม่มีสิทธิ์)
+                message = url_data.get('detail', 'Access denied. The URL may be blocked or you do not have permission.')
+                flash(f'{message}', 'error')
             else:
-                message = url_data.get('detail', '')
-                flash('Failed to shorten URL.', 'danger')
+                # Other errors
+                message = url_data.get('detail', 'An unexpected error occurred. Please try again.')
+                flash(f'{message}', 'danger')
         except requests.exceptions.ConnectionError:
             flash('Failed to connect to the server. Please try again later.', 'error')
         except requests.exceptions.HTTPError as http_err:
