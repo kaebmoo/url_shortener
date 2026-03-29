@@ -127,11 +127,14 @@ async def deactivate_expired_urls_periodically():
     """Periodically deactivate expired URLs every 24 hours."""
     try:
         while True:
-            db = next(get_db())
-            # กำหนดระยะเวลาหมดอายุเป็น 30 นาที
-            # crud.deactivate_expired_urls(db, timedelta(minutes=30))
-            # กำหนดระยะเวลาหมดอายุเป็น 7 วัน
-            crud.deactivate_expired_urls(db, timedelta(days=7))
+            try:
+                with SessionLocal() as db:
+                    # กำหนดระยะเวลาหมดอายุเป็น 30 นาที
+                    # crud.deactivate_expired_urls(db, timedelta(minutes=30))
+                    # กำหนดระยะเวลาหมดอายุเป็น 7 วัน
+                    crud.deactivate_expired_urls(db, timedelta(days=7))
+            except Exception:
+                logging.exception("Failed to deactivate expired URLs during periodic cleanup")
             await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
 
     except asyncio.CancelledError:
@@ -142,11 +145,14 @@ async def remove_expired_urls_periodically():
     """Periodically deactivate expired URLs every 24 hours."""
     try:
         while True:
-            db = next(get_db())
-            # ลบ URL ที่หมดอายุหลังจาก 30 นาที
-            # crud.remove_expired_urls(db, timedelta(minutes=30))
-            # ลบ URL ที่หมดอายุหลังจาก 30 วัน
-            crud.remove_expired_urls(db, timedelta(days=30))
+            try:
+                with SessionLocal() as db:
+                    # ลบ URL ที่หมดอายุหลังจาก 30 นาที
+                    # crud.remove_expired_urls(db, timedelta(minutes=30))
+                    # ลบ URL ที่หมดอายุหลังจาก 30 วัน
+                    crud.remove_expired_urls(db, timedelta(days=30))
+            except Exception:
+                logging.exception("Failed to remove expired URLs during periodic cleanup")
             await asyncio.sleep(86400)  # ทุก 24 ชั่วโมง
 
     except asyncio.CancelledError:
@@ -347,8 +353,14 @@ def get_blacklist_db():
 def get_optional_api_db():
     ''' optional api database '''
     if get_settings().use_api_db:
-        return next(get_api_db())
-    return None
+        db = SessionAPI()
+        try:
+            yield db
+        finally:
+            db.close()
+        return
+
+    yield None
 
 def verify_jwt_token(authorization: str = Header(None)):
     ''' verify jwt token. Verify the JWT token and raise appropriate errors.'''

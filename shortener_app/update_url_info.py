@@ -11,7 +11,15 @@ from shortener_app.config import get_settings
 
 DATABASE_URL = get_settings().db_url  # ควรเปลี่ยนเป็น URL ของฐานข้อมูลที่คุณใช้
 
-engine = create_engine(DATABASE_URL)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+        pool_use_lifo=True,
+    )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 async def fetch_page_info(url: str):
