@@ -1,10 +1,12 @@
 # shortener_app/crud.py
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
 from itsdangerous import BadSignature, SignatureExpired
 
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -20,6 +22,41 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+
+READ_QUERY_RETRY_ATTEMPTS = 2
+READ_QUERY_RETRY_DELAY_SECONDS = 0.2
+
+
+def _run_critical_read_with_retry(db: Session, query_name: str, operation):
+    last_error = None
+
+    for attempt in range(1, READ_QUERY_RETRY_ATTEMPTS + 1):
+        try:
+            return operation()
+        except OperationalError as exc:
+            last_error = exc
+        except DBAPIError as exc:
+            if not getattr(exc, "connection_invalidated", False):
+                raise
+            last_error = exc
+
+        db.rollback()
+
+        if attempt == READ_QUERY_RETRY_ATTEMPTS:
+            break
+
+        logger.warning(
+            "Retrying critical read query '%s' after database connection error (attempt %s/%s)",
+            query_name,
+            attempt + 1,
+            READ_QUERY_RETRY_ATTEMPTS,
+        )
+        time.sleep(READ_QUERY_RETRY_DELAY_SECONDS)
+
+    if last_error is not None:
+        raise last_error
+
+    raise RuntimeError(f"Critical read query '{query_name}' failed without an exception")
 
 def insert_roles(db: Session):
     """
@@ -108,16 +145,28 @@ def deactivate_db_url_by_secret_key(db: Session, secret_key: str, api_key: str) 
         return None
 
 def get_api_key(db: Session, api_key: str) -> models.APIKey:
-    return db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
+    return _run_critical_read_with_retry(
+        db,
+        "get_api_key",
+        lambda: db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first(),
+    )
 
 def get_role_id(db: Session, api_key: str) -> int:
-    api_key_data = db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first()
+    api_key_data = _run_critical_read_with_retry(
+        db,
+        "get_role_id",
+        lambda: db.query(models.APIKey).filter(models.APIKey.api_key == api_key).first(),
+    )
     if api_key_data:
         return api_key_data.role_id
     return None
 
 def get_role_name(api_db: Session, role_id: int) -> str:
-    role = api_db.query(models.Role).filter(models.Role.id == role_id).first()
+    role = _run_critical_read_with_retry(
+        api_db,
+        "get_role_name",
+        lambda: api_db.query(models.Role).filter(models.Role.id == role_id).first(),
+    )
     if role:
         return role.name
     return None
@@ -138,7 +187,11 @@ def is_url_existing_for_key(db: Session, target_url: str, api_key: str) -> model
 # เพิ่มใน shortener_app/crud.py
 def is_url_in_blacklist(db: Session, url: str) -> bool:
     """Checks if a URL is in the blacklist."""
-    return db.query(models.Blacklist).filter(models.Blacklist.url == url).first() is not None
+    return _run_critical_read_with_retry(
+        db,
+        "is_url_in_blacklist",
+        lambda: db.query(models.Blacklist).filter(models.Blacklist.url == url).first() is not None,
+    )
 
 def create_verification_token(user, expiration=604800):
     """Generate a confirmation token to a new user. - open api"""
